@@ -1,0 +1,27 @@
+plugins { id 'java' }
+
+group = 'com.foundations.cluster'
+version = '0.0.6a.R19'
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+dependencies {
+    compileOnly 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
+}
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+// Keep the Windows extraction path short. Long nested package paths were able
+// to leave the old deep src/main/java/... file missing while Gradle still ran.
+sourceSets {
+    main {
+        java { srcDirs = ['source'] }
+        resources { srcDirs = ['resources'] }
+    }
+}
+
+jar { archiveBaseName = 'foundations_velocity_gateway' }

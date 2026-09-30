@@ -1,0 +1,7 @@
+These are the exact executed Linux test-harness sources, preserved as evidence.
+The harness paths refer to the isolated build environment, not a user installation.
+It requires the compiled Manager test classes, both candidate Node versions, a
+local NeoForge 21.1.250 template, and its test-only GrowthFixture mod. It creates
+disposable offline test worlds and uses accelerated random ticks only there.
+Do not install the fixture mod in production. The normal reusable retained
+integration suite is tests/persistence_integration_test.py (--help).

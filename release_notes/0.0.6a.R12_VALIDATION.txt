@@ -1,0 +1,17 @@
+R12 validation completed in build workspace:
+- Cluster Manager Java compilation: PASS
+- Built Manager version: 0.0.6a.R12
+- Cluster Node compatibility constant: 0.0.6a.R4
+- WebUI app.js syntax (node --check): PASS
+- Desktop testlab.py / main_window.py py_compile: PASS
+- Operator transfer endpoint routes to requestManualBackendTransfer: PASS (source inspection)
+- Region moveSessions route routes to requestManualBackendTransfer: PASS (source inspection)
+- WebUI/Desktop acceptance requires physical anchor + simulation migration: PASS (source inspection)
+
+Runtime verification still required on the live Cluster:
+1. Connect through Velocity.
+2. Note current anchor worker.
+3. Transfer player to another READY worker.
+4. Verify Velocity log shows source disconnect + destination connect.
+5. Verify /api/sessions anchorWorkerId and simulationWorkerId both equal destination.
+6. Verify player-state workerId updates to destination.

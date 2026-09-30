@@ -1,0 +1,22 @@
+{
+  "release": "0.0.6a.R19-HF3",
+  "baseline": "0.0.6a.R19-HF2",
+  "reproduced_baseline_failure": "CONFIG ping 0 was ignored; NeoForge cannot advance",
+  "ping_checks": 32,
+  "retained_handshake_checks": 49,
+  "patched_jar_handshake_checks": 81,
+  "web_handoff_cases": 9,
+  "web_acceptance_cases": 24,
+  "web_button_cases": 16,
+  "manager_assertions": 89,
+  "java_target": 21,
+  "live_client_tested": false,
+  "windows_tested": false,
+  "updater_script_changed": false,
+  "region_routing_fixed": false,
+  "advancement_file_lock_fixed": false,
+  "official_dependency_sha256": {
+    "neoforge-21.1.250-userdev.jar": "deb6dd1e002aa85406e92501f49d5429cc8eaefe32fc353433e67030c32d8372",
+    "neoforge-21.1.250-sources.jar": "a2811d794544ec67dc3fa43b900158f058ea534881ba1c160373554384311a0d"
+  }
+}

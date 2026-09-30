@@ -1,0 +1,72 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.5a.R7.R6
+=========================================
+
+R7.R6 adds cluster-wide player profile continuity and safe worker evacuation.
+It keeps the R7/R7.R4/R7.R5 live world replication + durable block/BlockEntity
+persistence pipeline intact.
+
+GRACEFUL STOP / FORCE STOP
+--------------------------
+- Dashboard Stop now means graceful drain + evacuation.
+- New default player evacuation deadline: 10 seconds
+  (worker.evacuationGraceSeconds=10).
+- A draining worker stops accepting new placements.
+- Existing player anchors are moved through the existing snapshot/preload handoff
+  flow and then switched by Velocity to healthy workers.
+- Multiple player handoffs are emitted in one worker heartbeat instead of one
+  player per heartbeat.
+- Destination selection accounts for already-pending evacuations, spreading a
+  drain across healthy workers instead of blindly choosing one destination.
+- Region authority is evacuated/retried during the grace window.
+- Minecraft `stop` is sent only after player anchors, simulation targets,
+  heartbeat player count, and owned authority regions have reached zero.
+- If evacuation cannot finish before the deadline, normal Stop ABORTS and the
+  worker is returned to routing instead of disconnecting players.
+- Cancel Stop is available while the drain is active.
+- Force Stop remains an explicit emergency hard-kill path and does not promise
+  player continuity.
+- JVM shutdown grace remains separate (worker.stopGraceSeconds, default 30s), so
+  the 10-second player drain does not shorten Minecraft's final save window.
+
+CLUSTER PLAYER PROFILE CONTINUITY
+---------------------------------
+- Manager-owned profile staging directory: runtime/player-profiles/<uuid>/
+- Default shared records:
+    playerdata/{uuid}.dat
+    advancements/{uuid}.json
+    stats/{uuid}.json
+- Before a real backend evacuation switch, the source Node flushes player NBT,
+  advancements, and statistics; Manager checkpoints those files and stages the
+  newest cluster copy into the destination worker before Velocity connects it.
+- Before initial placement/login, Manager stages any existing cluster profile
+  into the selected worker.
+- This carries vanilla inventory/armor/offhand/Ender Chest and other normal
+  playerdata NBT, vanilla advancements, and vanilla statistics across workers.
+- playerProfile.sharedFiles can add additional per-player files that use
+  {uuid} and/or {name} placeholders.
+
+QUEST / MOD NOTE
+----------------
+R7.R6 automatically carries quest/progression state when a mod stores that state
+inside normal player NBT/NeoForge player persistence, vanilla advancements, or a
+configured per-player file. Mods that keep quest/team progress in an unrelated
+server-wide database or custom external store still require a dedicated adapter
+or an explicitly safe shared-data strategy; R7.R6 does not pretend those formats
+are universal.
+
+ANTI-ROLLBACK / SAFETY
+----------------------
+- Existing session authority checks remain in force: after a handoff commits,
+  stale player-state posts from the old anchor are rejected.
+- Source profile capture occurs before the proxy commit; destination profile
+  preparation occurs before Velocity is allowed to switch.
+- Force Stop cancellation cannot accidentally re-enable routing on a killed JVM.
+- A graceful worker shutdown will not complete while authority regions remain on
+  that worker.
+
+VELOCITY
+--------
+The existing Foundations Velocity Gateway R7.R2 transport is protocol-compatible
+with this update; no gateway rebuild is required. R7.R6 exposes evacuation-only
+PROXY_READY handoffs through the same /api/gateway/handoffs contract it already
+polls.

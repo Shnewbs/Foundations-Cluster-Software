@@ -1,0 +1,9 @@
+Foundations Cluster Runtime 0.0.5a.R7 -> 0.0.5a.R7.R2
+
+1. Shut down the existing cluster from the Web UI.
+2. Extract this folder over the existing 0.0.5a.R7 installation.
+3. Allow replacement of program files.
+4. Do NOT delete runtime/, workers/, logs/, server-template/, velocity/, or your active config/cluster.properties.
+5. Start start_foundations_server.bat.
+
+This is a manager/Web UI hardening revision. Cluster Node remains 0.0.5a.R7 and should not rebuild solely for R7.R2.

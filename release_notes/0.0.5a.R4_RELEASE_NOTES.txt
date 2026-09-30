@@ -1,0 +1,11 @@
+Foundations Cluster Runtime 0.0.5a.R4
+
+Velocity configuration hardening revision.
+
+Fixes
+- Writes an explicit empty [forced-hosts] table in velocity/velocity.toml.
+  Velocity 3.x can otherwise merge its sample lobby/factions/minigames forced hosts
+  when the section is absent and refuse to start because those servers do not exist.
+- Rebuilds the Foundations Velocity Gateway adapter as 0.0.5a.R4.
+- Primes dynamic worker topology immediately at proxy initialization.
+- Keeps worker registration dynamic; no static lobby/backend entries are required.

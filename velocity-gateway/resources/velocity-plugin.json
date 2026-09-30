@@ -1,0 +1,9 @@
+{
+  "id": "foundations_gateway",
+  "name": "Foundations Gateway",
+  "version": "0.0.6a.R19",
+  "description": "Foundations Cluster persistent-session gateway adapter",
+  "authors": ["Foundations"],
+  "dependencies": [],
+  "main": "com.foundations.cluster.velocity.FoundationsVelocityGateway"
+}

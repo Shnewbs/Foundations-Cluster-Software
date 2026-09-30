@@ -1,0 +1,73 @@
+HF11 updater transactions: PASS (70 checks)
+PASS check-only succeeds
+PASS check-only leaves deployment intact
+PASS custom-path installation succeeds:  journals, player data, settings, Gateway and Conduit were not edited.
+Start Cluster normally. Expect Node READY and nodeExpected/version 0.0.6a.R13.
+
+PASS two existing deployments reported
+PASS precompiled R13 bytes installed minecraft-agent/build/libs
+PASS precompiled R13 bytes installed custom template/mods
+PASS old active Node removed custom template/mods
+PASS precompiled R13 bytes installed custom workers/worker-003/mods
+PASS old active Node removed custom workers/worker-003/mods
+PASS precompiled R13 bytes installed custom workers/worker-004/mods
+PASS old active Node removed custom workers/worker-004/mods
+PASS custom paths honored, no default workers created
+PASS compiled HF11 Manager installed
+PASS source version matches R13
+PASS world preserved
+PASS journal preserved
+PASS security vault preserved
+PASS unrelated mod preserved
+PASS operator config preserved
+PASS durable rollback journal exists
+PASS rerun on HF11 succeeds
+PASS rerun leaves one active Node
+PASS completed update rollback succeeds
+PASS rollback restores every original deployment file
+PASS rollback is idempotent
+PASS failure injected at operation 1
+PASS automatic complete rollback at operation 1
+PASS world preserved
+PASS journal preserved
+PASS security vault preserved
+PASS unrelated mod preserved
+PASS operator config preserved
+PASS failure injected at operation 3
+PASS automatic complete rollback at operation 3
+PASS world preserved
+PASS journal preserved
+PASS security vault preserved
+PASS unrelated mod preserved
+PASS operator config preserved
+PASS failure injected at operation 7
+PASS automatic complete rollback at operation 7
+PASS world preserved
+PASS journal preserved
+PASS security vault preserved
+PASS unrelated mod preserved
+PASS operator config preserved
+PASS failure injected at operation 12
+PASS automatic complete rollback at operation 12
+PASS world preserved
+PASS journal preserved
+PASS security vault preserved
+PASS unrelated mod preserved
+PASS operator config preserved
+PASS failure injected at operation 20
+PASS automatic complete rollback at operation 20
+PASS world preserved
+PASS journal preserved
+PASS security vault preserved
+PASS unrelated mod preserved
+PASS operator config preserved
+PASS corrupt payload rejected
+PASS corrupt payload no changes
+PASS renamed R12 with updated manifest rejected
+PASS wrong embedded Node no changes
+PASS wrong source baseline rejected
+PASS wrong baseline no changes
+PASS running port rejects installation
+PASS port failure no changes
+PASS out-of-root path rejected
+PASS unsafe path no changes

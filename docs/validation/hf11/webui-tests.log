@@ -1,0 +1,6 @@
+Test Lab acceptance: PASS (51 cases)
+Test Lab persistence: PASS (22 cases)
+Test Lab handoff errors: PASS (9 cases)
+Test Lab restart: PASS (5 checks)
+Test Lab support capture: PASS (5 checks)
+Test Lab button checks: PASS (18 cases)

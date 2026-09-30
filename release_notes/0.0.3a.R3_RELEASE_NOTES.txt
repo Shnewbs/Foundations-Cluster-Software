@@ -1,0 +1,28 @@
+Foundations Cluster Runtime 0.0.3a.R3
+========================================
+
+Console + Operator Tooling revision.
+
+Added:
+- Authenticated Web Console page.
+- Cluster Manager command target.
+- Per-worker native Minecraft stdin console.
+- Broadcast target for all locally managed running workers.
+- Live worker/manager output tailing.
+- Combined all-worker output view.
+- Output filters, pause/resume, clear-view and browser log download.
+- Persistent console command history and keyboard history recall.
+- Audit events for console commands and failures.
+- Console policy settings in Web UI.
+
+Foundations console commands include status, workers, spawn, drain/undrain,
+maintenance, restart, stop, kill, sessions, player find, layer operations,
+and orphan listing.
+
+Security boundary:
+- No operating-system shell is exposed.
+- Worker stdin is available only for JVMs owned by the current manager process.
+- Orphaned JVMs must be killed/restarted before interactive console access can resume.
+
+Cluster Node protocol remains 0.0.3a.
+Region Authority remains scheduled for 0.0.4a.

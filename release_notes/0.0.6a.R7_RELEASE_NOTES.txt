@@ -1,0 +1,32 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a.R7 — CONTROL SURFACE PARITY
+================================================================
+
+FIXED — DESKTOP LIVE STATE
+- The Desktop Control Center now consumes /api/player-state, matching the WebUI.
+- Players & Sessions now includes a Live Player State table with name/UUID, worker,
+  dimension, coordinates, game mode, OP state, and record age.
+- Manager reachability remains independent of individual protected API failures,
+  preserving the R6 "WebUI live but Desktop offline" resilience fix.
+
+ADDED — WEBUI TEST LAB
+- Added a Test Lab navigation page to the browser dashboard.
+- Safe Suite validates Manager health/version, Gateway, worker registration,
+  Cluster Node versions, world identity, persistence, sessions, player-state API,
+  and scaling RAM guardrails.
+- Live tests include real backend handoff, inventory NBT round-trip, temporary
+  chest/BlockEntity authority transfer, graceful worker evacuation/stop, and
+  worker restart/rejoin.
+- Full Acceptance chains those tests behind an explicit destructive-test opt-in
+  and browser confirmation.
+
+VERSION
+- Cluster Manager: 0.0.6a.R7
+- Desktop Control Center: 0.0.6a.R7
+- Cluster Node protocol remains 0.0.6a.R2; no Node rebuild is required by R7.
+
+UPGRADE SAFETY
+- Incremental updater only replaces Manager binary/version source, Desktop files,
+  and WebUI files listed above.
+- It does NOT overwrite config, runtime state, workers, logs, server-template,
+  Velocity, worlds, player profiles, persistence journals, or credentials.
+- A timestamped backup of every replaced file is created before apply.

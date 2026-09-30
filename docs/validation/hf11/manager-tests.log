@@ -1,0 +1,54 @@
+Built cluster-manager/build/FoundationsClusterManager.jar
+2026-09-28T20:27:47.482042434Z [INFO] Cluster world seed locked from configuration: 1234
+2026-09-28T20:27:47.486542912Z [INFO] Cluster world identity pending; the first healthy seed-matched 0.0.6a worker will establish the canonical fingerprint.
+2026-09-28T20:27:47.494840527Z [INFO] Agent registered: worker-001 port=25566 state=ACTIVE external
+R16 self-tests: PASS (27 assertions)
+2026-09-28T20:27:47.965360145Z [INFO] Cluster world seed locked from configuration: 1234
+2026-09-28T20:27:47.970729381Z [INFO] Cluster world identity pending; the first healthy seed-matched 0.0.6a worker will establish the canonical fingerprint.
+R17 forwarding checks: PASS (9 assertions)
+2026-09-28T20:27:48.137324194Z [INFO] World environment coordinator initialized: enabled=true restored=false protocol=overworld-v1
+2026-09-28T20:27:48.221775740Z [INFO] World environment owner=worker-001 epoch=1; new owner must restore before publishing
+2026-09-28T20:27:48.239569564Z [INFO] World environment owner=worker-002 epoch=2; new owner must restore before publishing
+2026-09-28T20:27:48.242935215Z [INFO] World environment owner=worker-002 epoch=3; new owner must restore before publishing
+2026-09-28T20:27:48.246272703Z [INFO] World environment coordinator initialized: enabled=true restored=true protocol=overworld-v1
+2026-09-28T20:27:48.247711289Z [INFO] World environment owner=worker-001 epoch=5; new owner must restore before publishing
+R18 environment / policy checks: PASS (29 assertions)
+2026-09-28T20:27:48.471812116Z [INFO] Cluster world seed locked from configuration: 1234
+2026-09-28T20:27:48.477722877Z [INFO] Cluster world identity pending; the first healthy seed-matched 0.0.6a worker will establish the canonical fingerprint.
+2026-09-28T20:27:48.497791416Z [INFO] Region Authority initialized: enabled=true regionChunks=32 lease=15s autoFailover=false writeFencing=control-plane-only
+2026-09-28T20:27:48.512595937Z [INFO] Agent registered: worker-001 port=25566 state=READY external
+2026-09-28T20:27:48.513060922Z [INFO] Agent registered: worker-002 port=25567 state=READY external
+2026-09-28T20:27:48.553050292Z [INFO] Region authority created foundations/minecraft:overworld/r.0.0 owner=worker-001 epoch=1 reason=test
+2026-09-28T20:27:48.559265989Z [INFO] Region save requested foundations/minecraft:overworld/r.0.0 source=worker-001 epoch=1 checkpoint=650e54e4-0c0c-4732-a1b7-b6c8853f1b9a
+2026-09-28T20:27:48.588811494Z [INFO] Region save confirmed; authority transferred foundations/minecraft:overworld/r.0.0 worker-001 -> worker-002 epoch=2
+2026-09-28T20:27:48.590204401Z [INFO] Region save requested foundations/minecraft:overworld/r.0.0 source=worker-002 epoch=2 checkpoint=c9d740fd-a5cd-41a2-84b8-c1628e12dacc
+2026-09-28T20:27:48.600844922Z [WARN] Region transfer blocked foundations/minecraft:overworld/r.0.0: Disk write failed
+2026-09-28T20:27:48.602015412Z [INFO] Region save requested foundations/minecraft:overworld/r.0.0 source=worker-002 epoch=2 checkpoint=4c9a5a62-c167-4452-8d9c-7eaeedaf9126
+2026-09-28T20:27:48.612255482Z [WARN] Region transfer blocked foundations/minecraft:overworld/r.0.0: Cancelled by administrator
+R19 save barrier checks: PASS (9)
+2026-09-28T20:27:48.748420104Z [INFO] Installed Foundations Cluster Node 0.0.6a.R13 into /tmp/foundations-node-upgrade-15623404926903702125/server-template/mods
+2026-09-28T20:27:48.840350782Z [INFO] Cluster world seed locked from configuration: 1234
+2026-09-28T20:27:48.840577227Z [INFO] Cluster world identity pending; the first healthy seed-matched 0.0.6a worker will establish the canonical fingerprint.
+Node upgrade lifecycle: PASS (15 checks)
+2026-09-28T20:27:49.097603102Z [INFO] Cluster world seed locked from configuration: 1234
+2026-09-28T20:27:49.102352013Z [INFO] Cluster world identity pending; the first healthy seed-matched 0.0.6a worker will establish the canonical fingerprint.
+2026-09-28T20:27:49.117450038Z [INFO] Agent registered: worker-001 port=25566 state=READY external
+2026-09-28T20:27:49.117913024Z [INFO] Agent registered: worker-002 port=25567 state=READY external
+2026-09-28T20:27:49.140101731Z [INFO] Region Authority initialized: enabled=true regionChunks=32 lease=15s autoFailover=false writeFencing=control-plane-only
+2026-09-28T20:27:49.179851932Z [INFO] Region authority created foundations/minecraft:overworld/r.0.0 owner=worker-001 epoch=1 reason=test
+2026-09-28T20:27:49.199302723Z [INFO] Region authority ACTIVE foundations/minecraft:overworld/r.0.0 owner=worker-001 epoch=1
+2026-09-28T20:27:49.200051174Z [INFO] Region authority created foundations/minecraft:overworld/r.1.0 owner=worker-001 epoch=1 reason=unrelated
+2026-09-28T20:27:49.206347759Z [INFO] Persistent block journal initialized: enabled=true revision=0 blocks=0
+2026-09-28T20:27:49.230122638Z [INFO] Region authority ACTIVE foundations/minecraft:overworld/r.0.0 owner=worker-001 epoch=1
+2026-09-28T20:27:49.230846407Z [INFO] Region foundations/minecraft:overworld/r.0.0 -> FROZEN
+2026-09-28T20:27:49.231329691Z [INFO] Region foundations/minecraft:overworld/r.0.0 -> ACTIVE
+2026-09-28T20:27:49.236808198Z [INFO] Restored 2 Region Authority record(s) from runtime state; startup owner recovery grace=90s
+2026-09-28T20:27:49.237723993Z [INFO] Region Authority initialized: enabled=true regionChunks=32 lease=15s autoFailover=false writeFencing=control-plane-only
+2026-09-28T20:27:49.238727196Z [INFO] Region authority startup restore ACTIVE foundations/minecraft:overworld/r.0.0 owner=worker-001 epoch=1
+R19 destination hydration barrier: PASS (20 checks)
+2026-09-28T20:27:49.380387228Z [INFO] Persistent block journal initialized: enabled=true revision=0 blocks=0
+2026-09-28T20:27:49.400014493Z [INFO] Persistent BlockEntity journal initialized: enabled=true revision=0 blockEntities=0 payloadBytes=0 schema=host-block-v3
+2026-09-28T20:27:49.563088157Z [INFO] Support ZIP ready: support-bundles/Foundations-support-20260928-202749-2796ab42.zip
+2026-09-28T20:27:49.591497195Z [INFO] Support ZIP ready: support-bundles/Foundations-support-20260928-202749-a153d470.zip
+Support archives: PASS (25 checks)
+Restart availability: PASS (14 checks)

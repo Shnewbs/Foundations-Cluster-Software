@@ -1,0 +1,26 @@
+package com.foundations.cluster.qa;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.minecraft.commands.Commands;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.network.chat.Component;
+import java.util.Comparator;
+/** TEST ONLY. Produces a natural tick-eligible chunk without a connected player. */
+@Mod("foundations_growth_fixture")
+public final class GrowthFixture {
+ private static final TicketType<ChunkPos> TICKET=TicketType.create("foundations_growth_fixture",Comparator.comparingLong(ChunkPos::toLong));
+ public GrowthFixture(){NeoForge.EVENT_BUS.addListener(GrowthFixture::register);}
+ static void register(RegisterCommandsEvent e) {
+  e.getDispatcher().register(Commands.literal("fixture_tick_hold").requires(s->s.hasPermission(4))
+   .then(Commands.argument("x",IntegerArgumentType.integer()).then(Commands.argument("z",IntegerArgumentType.integer()).then(Commands.argument("hold",BoolArgumentType.bool()).executes(c->{
+    var pos=new ChunkPos(IntegerArgumentType.getInteger(c,"x"),IntegerArgumentType.getInteger(c,"z"));
+    if(BoolArgumentType.getBool(c,"hold"))c.getSource().getLevel().getChunkSource().addRegionTicket(TICKET,pos,2,pos,true);
+    else c.getSource().getLevel().getChunkSource().removeRegionTicket(TICKET,pos,2,pos,true);
+    c.getSource().sendSuccess(()->Component.literal("FIXTURE_TICK_HOLD_OK"),false);return 1;
+   })))));
+ }
+}

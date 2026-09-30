@@ -1,0 +1,12 @@
+{
+  "passed": 7,
+  "checks": [
+    "Two real NeoForge workers acknowledged one shared environment",
+    "Owner time/daylight/weather commands reached both workers",
+    "Fresh chest with 17 diamonds survived immediate authority transfer",
+    "Real creeper blast captured and durable queue acknowledged",
+    "Hard-killed owner: survivor replayed the crater instead of original terrain",
+    "Owner shutdown retained frozen clock and thunder on the survivor",
+    "Manager restart restored environment without importing stale worker state"
+  ]
+}

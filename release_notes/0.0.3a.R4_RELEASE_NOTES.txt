@@ -1,0 +1,31 @@
+Foundations Cluster Runtime 0.0.3a.R4
+========================================
+
+Foundations Gateway / Single-Entry Routing revision.
+
+Added:
+- Built-in Minecraft-aware Foundations Gateway owned by the Cluster Manager.
+- One public Minecraft endpoint (default 0.0.0.0:25565).
+- Backend workers bind internally by default (127.0.0.1, ports 25566+).
+- Minecraft 1.21.1 handshake/status handling (protocol 767).
+- Login Start username inspection before backend selection.
+- Join-time Layer Planner / worker placement.
+- Transparent byte-for-byte proxying after backend selection, including the normal
+  NeoForge login/plugin handshake, encryption, compression, configuration and play traffic.
+- Gateway route directory and live connection statistics.
+- Gateway page in the authenticated Web UI.
+- Gateway configuration in Web UI.
+- Gateway health alert when enabled but unable to bind.
+- Cluster console `gateway` command.
+- Worker port allocator reserves the public gateway port.
+- Worker restart rewrites server.properties with the configured internal bind address.
+- Stored OFFLINE workers are reused for the startup baseline before allocating new worker IDs when safe.
+
+Important boundary:
+- R4 selects a backend only at login time.
+- The encrypted Minecraft connection is passed through to the selected backend.
+- Live backend switching for a connected player is NOT implemented in R4.
+- Region Authority remains planned for 0.0.4a.
+- Seamless cross-worker handoff remains planned for 0.0.5a.
+
+Cluster Node protocol remains 0.0.3a.

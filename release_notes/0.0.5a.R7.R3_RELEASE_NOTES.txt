@@ -1,0 +1,13 @@
+Foundations Cluster Runtime 0.0.5a.R7.R3
+
+Region Authority UI / operator hardening revision.
+
+- Replaces refresh-sensitive inline region transfer dropdown with stable transfer modal.
+- Keeps destination selection while the dashboard polls every two seconds.
+- Adds Auto-select best healthy worker.
+- Filters unhealthy/offline/draining/maintenance/current-owner workers.
+- Revalidates destination immediately before transfer.
+- Disables transfer when no healthy destination exists.
+- Preserves Ensure Region worker selection across refreshes.
+- No changes to R7 chunk-read replication, data-plane protocol, or Cluster Node.
+- Includes prior R7.R2 Velocity plugin packaging/forwarding hardening.

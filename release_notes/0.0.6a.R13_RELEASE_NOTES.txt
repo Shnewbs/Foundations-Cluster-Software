@@ -1,0 +1,47 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a.R13
+======================================
+
+Purpose
+-------
+R13 is the final 0.0.6a transport/stability pass. R12's real physical player
+migration is preserved. R13 replaces the stock Velocity proxy core with the
+Velocity-compatible Conduit 1.8.0 runtime and enables its same-dimension
+seamless server-switch path for Minecraft 1.20.2+.
+
+What changes
+------------
+- Manager: 0.0.6a.R13
+- Cluster Node: 0.0.6a.R5
+- Foundations Gateway plugin: 0.0.6a.R13
+- Proxy core: Conduit 1.8.0, installed as velocity\velocity.jar
+- Conduit seamless server switching enabled with a 250 ms settle window
+- Existing R12 physical transfer checkpoint/commit logic remains intact
+- BlockEntity scanner default: 40 ticks; budget: 256
+- BlockEntity quiet coalesce: 5 seconds
+- Continuously-changing BlockEntity max flush interval: 5 minutes
+- Persistent BlockEntity summary logging reduced to every 1000 commits
+- Desktop Safe Suite and Full Suite now retain both QRunnable and signal QObject
+  for the full task lifetime, closing the remaining Qt timeout crash path
+- WebUI/Desktop Safe Suite verify the Conduit 1.8.0 seamless transport heartbeat
+
+Important seamless-transfer behavior
+------------------------------------
+Conduit can keep the client in PLAY while switching between compatible,
+same-dimension backends. If its protocol/registry/datapack/dimension checks do
+not permit a seamless transition, it intentionally falls back to the normal
+safe backend-switch path. A fallback may show Minecraft's Configuration /
+Reconfiguring phase; it is not treated as a false successful seamless switch.
+
+Third-party proxy core
+----------------------
+The updater does not bundle the Conduit binary. Before modifying the Cluster,
+it downloads the pinned Conduit 1.8.0 release asset from the official
+https://github.com/tame-gg/conduit release API and validates that the JAR
+contains the Conduit proxy-core marker class. If download or validation fails,
+the updater aborts without changing the Cluster.
+
+Preserved data
+--------------
+The updater does NOT replace worlds, runtime journals, session state, player
+profiles, security vaults, or arbitrary operator config. Exact old R12 defaults
+are migrated where required; custom values are retained.

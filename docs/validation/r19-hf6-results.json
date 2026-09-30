@@ -1,0 +1,33 @@
+{
+  "release": "0.0.6a.R19-HF6",
+  "baseline": "0.0.6a.R19-HF5",
+  "reported_rejection": "neoforge:known_registry_data_maps",
+  "reported_lengths": [
+    385,
+    385
+  ],
+  "reported_fingerprints": [
+    "21bce21a8d78",
+    "cafd7bb691f1"
+  ],
+  "paired_user_payloads_available": false,
+  "startup_hotfix_marker_in_supplied_output": false,
+  "baseline_reproduction": "equivalent reordered data-map declarations rejected by HF5",
+  "declaration_checks": 366,
+  "retained_handshake_checks": 351,
+  "patched_jar_handshake_checks": 717,
+  "web_handoff_cases": 9,
+  "web_acceptance_cases": 24,
+  "web_button_cases": 16,
+  "manager_assertions": 89,
+  "manager_java_target": 21,
+  "live_client_tested": false,
+  "windows_tested": false,
+  "updater_transaction_changed": false,
+  "enum_member_order_normalized": false,
+  "mandatory_flags_ignored": false,
+  "region_routing_fixed": false,
+  "advancement_file_lock_fixed": false,
+  "neoforge_sources_sha256": "a2811d794544ec67dc3fa43b900158f058ea534881ba1c160373554384311a0d",
+  "conduit_1_8_0_sha256": "60b676015e0a0d7917611f5564c05927f933eecc12c2b424784ce25738b5f7d6"
+}

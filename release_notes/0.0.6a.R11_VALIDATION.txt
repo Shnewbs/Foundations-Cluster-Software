@@ -1,0 +1,21 @@
+R11 BUILD VALIDATION
+
+PASS  Manager javac --release 21
+PASS  Manager JAR reports 0.0.6a.R11 and Node target 0.0.6a.R4
+PASS  Foundations Cluster Node R4 compiled with bundled Minecraft/NeoForge 1.21.1/21.1.250 runtime libraries
+PASS  Node R4 JAR contains META-INF/neoforge.mods.toml version 0.0.6a.R4
+PASS  Velocity R11 source compiled against bundled Velocity 3.4 API
+PASS  Velocity plugin metadata reports 0.0.6a.R11
+PASS  WebUI JavaScript syntax check
+PASS  Desktop Python main_window/testlab syntax compile
+PASS  Incremental updater preserves config/runtime/world/security state and performs backup/rollback
+
+RUNTIME ACCEPTANCE AFTER UPDATE
+1. Start Cluster and run WebUI Safe Suite.
+2. Confirm Manager=0.0.6a.R11, Node=0.0.6a.R4, World Identity schema=2.
+3. Confirm Velocity Gateway shows one PID and ownership=owned (or adopted after intentional Manager-only restart).
+4. Perform a normal seamless live handoff. Anchor must remain unchanged.
+5. Perform chest/BlockEntity round-trip. Journal protocol must report block+blockentity-journal-v3.
+6. Test graceful Restart on the current anchor. R10 evacuation behavior must remain intact.
+7. Optional crash-only test: hard-close an anchor worker with another healthy worker available. Velocity should attempt emergency redirect rather than immediately dropping the client.
+8. Leave Desktop open while Manager is stopped/unavailable for >5 seconds; Desktop must remain running and show the API error/offline state.

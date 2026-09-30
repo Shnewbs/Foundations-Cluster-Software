@@ -1,0 +1,15 @@
+Foundations Cluster Runtime 0.0.5a.R7
+
+Authoritative Chunk Read Replication
+- Adds CHUNK_REQUEST / CHUNK_SNAPSHOT data-plane frame types.
+- Session-anchor workers request authoritative chunk snapshots when a player's Region Authority owner is another JVM.
+- Authority workers serialize compressed block-state snapshots with region epoch metadata.
+- Session anchors materialize those snapshots into a replica cache/world view without changing the player's Minecraft connection.
+- Existing BLOCK_DELTA frames continue to keep replicas current after the initial snapshot.
+- Adds snapshot request throttling, cache TTL, radius and vertical-range controls.
+- Adds worker-aware Region Authority dropdowns in the Web UI.
+
+Safety boundary
+- R7 is read-replication/cache groundwork, not shared Anvil storage.
+- Region Authority remains the only accepted source for CHUNK_SNAPSHOT frames.
+- Replica chunks on anchor workers are caches and must never be treated as persistent authority.

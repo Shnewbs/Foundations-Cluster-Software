@@ -1,0 +1,13 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a PACKAGE MANIFEST
+
+Drop-in update contents:
+- Complete 0.0.6a Cluster Manager executable JAR and manager Java sources.
+- Complete 0.0.6a NeoForge Cluster Node project and compiled JAR.
+- 0.0.6a Node JAR installed in server-template/mods for future workers.
+- Complete dashboard static files.
+- 0.0.6a default configuration.
+- Upgrade-safe APPLY_6A_UPDATE.bat / tools/apply_6a_update.ps1.
+- Release notes, validation notes, and live acceptance checklist.
+
+Runtime data, worker worlds, persistence journals, player profiles, Velocity files,
+and user cluster.properties are intentionally not bundled/replaced.

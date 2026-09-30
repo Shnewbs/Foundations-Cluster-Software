@@ -1,0 +1,18 @@
+{
+  "mode": "fixed",
+  "nodeVersion": "0.0.6a.R13",
+  "passed": 10,
+  "checks": [
+    "Both real NeoForge workers booted with 0.0.6a.R13",
+    "Synthetic session anchored to worker-002 while authority is worker-001; no game clients joined",
+    "Replica receives the planted stage-zero sapling through real chunk snapshots",
+    "R13 blocks replica-side natural random growth even with a native forced-ticking ticket",
+    "R13 grows stage-zero sapling into logs/leaves via native random ticks on the playerless authority",
+    "Manager journal contains naturally generated oak logs and leaves; durable queue is acknowledged",
+    "Replica matches all 6144 sampled block states after natural growth, without ownership transfer",
+    "Read-only growth diagnostics expose active ticket, natural chunk ticks and captured mutations",
+    "Expired remote view releases its transient forced-ticking ticket",
+    "Naturally grown tree survives acknowledged authority A -> B -> A replay"
+  ],
+  "scope": "Real NeoForge workers and native random ticks; synthetic session/view requests; no client/physical handoff test."
+}

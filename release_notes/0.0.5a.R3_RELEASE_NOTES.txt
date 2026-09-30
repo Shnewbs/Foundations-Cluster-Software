@@ -1,0 +1,10 @@
+Foundations Cluster Runtime 0.0.5a.R3
+
+Fixes the Windows first-boot Gradle race discovered while preparing Velocity and the Cluster Node concurrently.
+
+Changes:
+- Shared Windows named mutex serializes Gradle distribution bootstrap.
+- Gradle downloads/extractions use unique staging paths and become live only after verification.
+- Velocity bootstrap reuses an already-installed Gradle and parses the bootstrap result defensively.
+- Fresh startup sequences Velocity preparation after the Cluster Node is installed, preventing concurrent first-boot Gradle builds.
+- Existing Node version remains 0.0.5a; no Node source/protocol change is required for this revision.

@@ -1,0 +1,46 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a — DYNAMIC CLUSTER SCALING
+
+0.0.6a is the orchestration milestone built on top of the tested 0.0.5a.R7.R6
+world, BlockEntity, player-profile, and graceful-drain foundation.
+
+ADDED
+- Dynamic scaling controller with Manual, Assisted, and Automatic modes.
+- Population consolidation toward fewer workers when load falls.
+- Batch graceful drain of multiple excess workers; all drain targets are fenced
+  from receiving new placements before evacuation begins.
+- Target-utilization planning (default 75%) rather than packing JVMs to 100%.
+- Multi-signal pressure detection using players, MSPT, CPU, and heap usage.
+- Scale-up / scale-down sustain windows and cooldown hysteresis.
+- Hard host-memory guardrail shared by manual starts and the autoscaler.
+- Physical RAM auto-detection when scaling.memory.totalBudgetGb=0.
+- Conservative per-worker reservation: explicit reservation or Xmx + native/JVM
+  overhead (default 20%, minimum 1 GiB overhead).
+- Effective worker maximum = min(configured max, RAM-derived max).
+- Configurable parallel consolidation drains.
+- Assisted-mode dashboard approval for scale-up and consolidation actions.
+- Locked cluster world seed for newly-created workers.
+- Cluster world identity fingerprint using actual seed, Minecraft version,
+  NeoForge mod IDs/versions, datapacks, and configured worldgen-related files.
+- Optional identity enforcement that rejects incompatible workers from routing.
+- Dashboard visibility for memory budget, effective max workers, seed/identity,
+  autoscaling recommendations, desired worker count, and worker identity match.
+- Alerts for memory-cap exhaustion and seed/world-identity mismatch.
+
+PRESERVED
+- R7 live chunk/block replication across workers.
+- R7.R4 durable block-state persistence.
+- R7.R5 generic BlockEntity persistence for vanilla/modded containers/machines.
+- R7.R6 cluster player profile continuity and 10-second graceful Stop evacuation.
+- Separate Cancel Stop and Force Stop controls.
+- Independent per-worker world folders; workers do NOT share one live world directory.
+
+UPGRADE SAFETY
+- Existing clusters are upgraded with world.identity.enforce=false initially.
+  This prevents an old cluster with historically different worker world seeds from
+  being locked out on first 6a boot.
+- 6a adopts/persists the canonical cluster seed and first healthy worker identity
+  when no canonical identity has been established yet.
+- After workers report MATCH in the dashboard, identity enforcement may be enabled.
+
+DEFAULT SCALING MODE
+- Manual. Move to Assisted first for live validation, then Automatic when satisfied.

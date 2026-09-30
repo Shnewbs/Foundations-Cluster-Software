@@ -1,0 +1,27 @@
+Foundations Cluster Runtime 0.0.5a.R7
+=====================================
+
+Simulation Data Plane / Authority RPC foundation.
+
+Added
+-----
+- Authenticated manager-mediated worker relay (`relay-v1`).
+- Per-worker bounded queues, in-flight tracking, ACK, retry and TTL/drop handling.
+- Session Anchor validation for remote request frames.
+- Region Authority owner + epoch fencing for persistent deltas.
+- Simulation route tokens in Cluster Node heartbeat control responses.
+- Web UI Simulation Data Plane metrics/history.
+- `dataplane` Foundations console command.
+- Cluster Node 0.0.5a.R7 data-plane poll/ACK client.
+- Creative-only remote block break/place prototype.
+- Registry ID + block-state-property encoding for block replica deltas.
+
+Safety
+------
+- Survival remote block mutation remains blocked in R6 to avoid inventory/drop/tool duplication.
+- Worker world directories remain physically separate.
+- Do not point multiple workers at one writable world directory.
+
+Next
+----
+- Remote chunk snapshot/read replication, then block entities/containers and richer simulation state.

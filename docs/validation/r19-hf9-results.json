@@ -1,0 +1,28 @@
+{
+  "package": "0.0.6a.R19-HF9",
+  "node": "0.0.6a.R11",
+  "gateway": "0.0.6a.R19",
+  "node_and_gateway_unchanged": true,
+  "tests": {
+    "retained_manager_and_support": 134,
+    "new_restart_policy": 14,
+    "managed_java_fixture_http_lifecycle": 9,
+    "web_unit": 83,
+    "hydration_http": 13,
+    "support_http": 20
+  },
+  "user_hf8_evidence": {
+    "inventory_samples": 5,
+    "distinct_inventory_nbt": 1,
+    "chest_samples_with_17_diamonds": 3,
+    "generated_tree_identical_hash_samples": 3,
+    "physical_handoffs_committed": 3,
+    "restart_state": "DRAINED"
+  },
+  "limits": [
+    "No HF9 real Minecraft or Windows execution",
+    "Java fixture lifecycle tests do not exercise game-client seamlessness",
+    "Malformed stats JSON not supplied; no player-profile repair attempted",
+    "Full replica simulation remains incomplete"
+  ]
+}

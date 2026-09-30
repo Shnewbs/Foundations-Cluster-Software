@@ -1,0 +1,54 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a.R11 — STABILIZATION REVISION
+
+Baseline: 0.0.6a.R10
+Manager: 0.0.6a.R11
+Cluster Node: 0.0.6a.R4
+World Identity: schema 2 (unchanged)
+
+R11 intentionally does not redesign the working seamless handoff path.
+
+FIXES
+-----
+1. BlockEntity persistence stabilization
+   - Debounces/coalesces rapidly changing BlockEntity state (default quiet window 5s, max 15s).
+   - Final BlockEntity state is synchronously flushed before handoff source snapshot and server shutdown.
+   - Durable BlockEntity journal protocol advances to host-block-v3.
+   - Host block state is stored with BlockEntity NBT so replay can reconstruct the correct chest/beehive/etc. before applying NBT.
+   - Existing R7-R10 v2 BlockEntity journal rows remain readable.
+   - Manager no longer writes one INFO log line for every BlockEntity mutation; it samples commit telemetry.
+
+2. Velocity process ownership
+   - Manager tracks Velocity PID and whether the process is directly owned or adopted.
+   - If a Foundations Velocity JVM survived a Manager crash/restart, R11 recognizes/adopts it rather than launching a duplicate.
+   - If the public gateway port is occupied by an unrecognized process, startup refuses the duplicate Velocity launch cleanly.
+   - Full Cluster shutdown terminates the owned/adopted Foundations Velocity process.
+
+3. Emergency backend-loss redirect
+   - New authenticated /api/gateway/failover control path.
+   - Velocity listens for backend-loss events and asks the Manager for a safe replacement worker.
+   - Manager independently verifies/quarantines the failed backend before allowing redirect, preventing normal /kick behavior from being mistaken for a crash.
+   - Existing player/profile state is prepared on the replacement backend before Velocity redirects.
+   - Graceful Stop/Restart still uses the R10 evacuation pipeline; normal seamless handoff remains anchor-preserving.
+
+4. Desktop Control Center crash fix
+   - Qt QRunnable auto-delete is disabled for API tasks.
+   - Both QRunnable and TaskSignals receive strong lifetime retention until the GUI callback completes.
+   - Late completion/error signals during teardown are treated as cancellation instead of crashing Python.
+   - API timeout now leaves the Desktop running and reports Manager unavailable.
+
+5. Acceptance updates
+   - Runtime expected Manager version is R11 and Node version is R4.
+   - Persistence test expects block+blockentity-journal-v3.
+   - Velocity test validates one recognized process PID with owned/adopted ownership state.
+
+PRESERVED
+---------
+- Runtime state, worlds, player profiles, sessions, credentials/security vaults, config and journals.
+- World Identity schema 2 and current canonical fingerprint.
+- R10 graceful Stop/Restart evacuation behavior.
+- Healthy live handoff: simulation target moves while Velocity anchor remains connected.
+
+UPDATER WORKFLOW
+- The R11 updater is portable and does not need to be merged into the live Cluster directory.
+- Run the BAT from any folder, paste or drag the live Foundations Cluster root when prompted, and it validates the Manager JAR before changing anything.
+- Backups and rollback data are still written under the selected live Cluster root.

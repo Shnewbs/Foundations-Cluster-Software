@@ -1,0 +1,12 @@
+{
+  "release": "0.0.6a.R19-HF1",
+  "baseline_reproduction": {
+    "expected_bytes": 26,
+    "captured_bytes": 26,
+    "forwarded_bytes": 0
+  },
+  "packet_integrity_checks": 29,
+  "existing_handshake_checks": 20,
+  "live_client_tested": false,
+  "component_jars_unchanged": true
+}

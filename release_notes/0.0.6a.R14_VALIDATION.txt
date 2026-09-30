@@ -1,0 +1,37 @@
+FOUNDATIONS CLUSTER 0.0.6a.R14 - VALIDATION CHECKLIST
+=====================================================
+
+Build/package checks performed before release:
+[x] Manager source changes compile on Java 21
+[x] Manager JAR reports 0.0.6a.R14 / Node 0.0.6a.R6
+[x] Gateway launcher prefers velocity\runtime\java25\bin\java.exe
+[x] Cluster Node R6 source compiles against NeoForge 21.1.250 / Minecraft 1.21.1
+[x] Node JAR contains FoundationsClusterNode.class and metadata reports 0.0.6a.R6
+[x] Foundations Gateway R14 compiles against the Velocity-compatible API
+[x] Gateway JAR metadata reports 0.0.6a.R14
+[x] Conduit 1.8.0 remains the seamless proxy core
+[x] R14 setup script contains Java 25 install/validation logic
+[x] BlockEntity chunk-unload path no longer force-publishes the full chunk
+[x] WebUI/Desktop acceptance expected versions are R14 / Node R6
+[x] updater payload contains every required changed file
+[x] updater ZIP integrity passes when packaged
+
+First live verification after update:
+1. Start the Cluster normally.
+2. Gateway should show VELOCITY / RUNNING, not FAILED.
+3. Manager log should include:
+     Foundations Gateway Java runtime=...\velocity\runtime\java25\bin\java.exe
+     Foundations Gateway starting in Conduit seamless session-proxy mode
+4. velocity.log should show Conduit booting without UnsupportedClassVersionError.
+5. Safe Suite should report Manager 0.0.6a.R14 and Node 0.0.6a.R6.
+6. Perform one physical Player Worker Transfer between two READY workers.
+7. Confirm both anchorWorkerId and simulationWorkerId move to the destination.
+8. Confirm destination backend connects and source backend disconnects.
+9. On compatible same-dimension workers, confirm no visible Reconfiguring screen.
+10. Leave the world active for several minutes and verify BlockEntity revisions
+    no longer increase by thousands every few seconds.
+11. Run the chest / BlockEntity authority round-trip and verify contents survive.
+
+R14 portable updater bootstrap hotfix: renamed local PowerShell variable $home to $javaHome to avoid collision with the read-only automatic $HOME variable. No runtime code or handoff behavior changed.
+
+Bootstrap hotfix 2: Java 25 validation no longer depends on PowerShell native stderr redirection.

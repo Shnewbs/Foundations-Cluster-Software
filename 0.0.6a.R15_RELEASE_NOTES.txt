@@ -1,0 +1,56 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a.R15
+========================================
+
+TARGET
+- Manager: 0.0.6a.R15
+- Cluster Node: 0.0.6a.R7
+- Foundations Gateway: 0.0.6a.R15
+- Proxy core: Conduit 1.8.0 + Foundations R15 NeoForge seamless bridge
+- Gateway Java: isolated Java 25
+- Minecraft/NeoForge workers: Java 21
+
+WHAT R15 CHANGES
+1. NeoForge seamless destination configuration
+   - Physical transfer sequencing remains source snapshot -> destination preload -> final source checkpoint -> proxy backend switch -> commit.
+   - R15 overlays only Conduit's SeamlessConfigSessionHandler. Configuration plugin messages are first offered to the active backend connection phase so Proxy Compatible Forge / NeoForge negotiation can respond without putting the Minecraft client back into CONFIGURATION.
+   - Vanilla brand rewriting remains intact. Unknown/unhandled CONFIGURATION messages are still swallowed rather than sent to a PLAY-state client.
+   - Gateway heartbeat reports conduit-1.8.0-foundations-r15-seamless-neoforge.
+
+2. Migration-aware graceful stop
+   - The existing short evacuation grace remains the initial deadline.
+   - If a real evacuation handoff is in flight, the source worker stays alive for up to worker.evacuationMigrationTimeoutSeconds (default 60 seconds).
+   - The worker is not killed merely because the original 10-second window elapsed while the proxy/backend negotiation was still progressing.
+
+3. Node R7 authority/data-plane cleanup
+   - Preserves the R6 BlockEntity coalescing/unload fix.
+   - Stale persistence/data-plane writes are fenced locally after Region Authority changes.
+   - Repeated HTTP 409 authority-transition noise is rate-limited/demoted.
+   - Identical replica chunk snapshots are deduplicated; zero-change applications are debug-only.
+
+4. WebUI
+   - Worker detail drawer slides in/out.
+   - Clicking the backdrop closes it.
+   - Escape closes it.
+   - Explicit close button remains.
+
+5. Windows build plumbing
+   - Manager source argfile uses forward-slash absolute paths so javac does not interpret Windows backslashes as escapes.
+   - BUILD_ALL_VISIBLE.bat keeps build results visible.
+
+SAFETY / PRESERVATION
+- The updater requires the Manager, Gateway and workers to be stopped.
+- Existing worlds, worker directories, journals, sessions, player profiles, security vaults and operator configuration are preserved.
+- Existing valid Java 25 gateway runtime is reused.
+- The official Conduit 1.8.0 release is downloaded before target changes, then the narrow Foundations R15 class overlay is applied and hash-verified.
+- A pre-R15 backup is retained under Cluster\backup.
+
+LIVE ACCEPTANCE TARGET
+- Safe Suite: Manager R15 / Node R7 / R15 NeoForge seamless Conduit heartbeat.
+- Physical transfer: destination reaches login/join instead of Conduit read timeout.
+- Both anchorWorkerId and simulationWorkerId move to the destination.
+- Source worker remains available until commit/abort.
+- No visible Reconfiguring screen on a compatible same-dimension seamless transfer.
+- BlockEntity commit rate remains controlled and authority transition logs do not flood 409 warnings.
+
+IMPORTANT
+The R15 NeoForge seamless bridge is evidence-based but has not been live-tested in this build environment. Treat the first physical migration as an acceptance test. If the destination configuration still times out, preserve the logs; do not regress to logical-only migration.

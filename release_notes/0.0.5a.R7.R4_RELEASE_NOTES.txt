@@ -1,0 +1,23 @@
+Foundations Cluster Runtime 0.0.5a.R7.R4
+
+Persistent World / Restart Hardening
+
+- Added manager-owned durable block mutation WAL (`runtime/persistent-blocks.wal`).
+- Authoritative block changes are now committed to the journal before they are considered restart-safe.
+- Current authority workers replay their region journal overlay after startup or authority-epoch changes.
+- Replayed mutations are checkpointed into vanilla Anvil storage.
+- Added periodic authority checkpoints and an explicit final checkpoint during clean worker shutdown.
+- Added a 90-second default startup owner-recovery grace so persisted region owners have time to return before automatic failover can hand authority to a stale worker copy.
+- Region authority logging now uses a stable owner/epoch/state fingerprint instead of logging every lease-renewal timestamp change.
+- Existing R7 live CHUNK_REQUEST / CHUNK_SNAPSHOT / BLOCK_DELTA replication remains unchanged.
+- Existing R7.R3 region dropdown/transfer UI remains unchanged.
+
+Acceptance target for this revision:
+1. Place/modify blocks while roaming across workers.
+2. Cleanly shut down the entire cluster.
+3. Restart the cluster.
+4. The authoritative mutations must still exist.
+5. Transfer authority between workers and verify journal replay follows the new owner.
+
+Important current boundary:
+R7.R4 makes ordinary block-state mutations restart-durable. Full block-entity/container/entity/POI region-file migration is still a separate persistence stage and is NOT claimed complete by this revision.

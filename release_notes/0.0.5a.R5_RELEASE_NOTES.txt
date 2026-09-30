@@ -1,0 +1,24 @@
+Foundations Cluster Runtime 0.0.5a.R5
+=====================================
+Persistent Session / Invisible Handoff Foundation
+
+CHANGED
+- Normal region/layer transitions no longer use Velocity backend switching.
+- Each active session now tracks two worker roles:
+  * Session Anchor: owns the live Minecraft client connection.
+  * Simulation Target: logical worker selected for region/layer simulation.
+- Two-phase transition still captures source state and preloads the destination.
+- After final source snapshot, Foundations commits the Simulation Target while preserving the Session Anchor.
+- /api/gateway/handoffs returns no proxy-switch work in persistent-session mode.
+- Velocity adapter no longer changes backend for normal transitions.
+- Web UI now shows Session Anchor vs Simulation Target explicitly.
+- Legacy Velocity switching remains opt-in for debugging/emergency compatibility only.
+
+DEFAULTS
+handoff.mode=persistent-session
+handoff.legacyVelocityBackendSwitch=false
+
+IMPORTANT
+This revision prevents the normal transition path from causing Minecraft's visible Reconfiguring/loading screen because it does not switch the player's backend session.
+
+It is a FOUNDATION, not the final distributed-world data plane. Remote chunks/entities/TFC/machines are not yet streamed from the Simulation Target to the Session Anchor. Separate worker world saves still remain separate.

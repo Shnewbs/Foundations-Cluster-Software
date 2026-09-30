@@ -1,0 +1,36 @@
+Foundations Cluster Runtime 0.0.4a
+=================================
+
+REGION AUTHORITY
+- Adds 32x32-chunk authority regions by default.
+- Adds owner lease ID, expiration and monotonically increasing fencing epoch.
+- Adds ACTIVE/SUSPECT/EXPIRED/RECOVERING/TRANSFERRING/FROZEN/UNASSIGNED states.
+- Adds lease-expiry failover and recovery hold.
+- Persists authority metadata across Cluster Manager restarts.
+- Distributes current authority assignments to Cluster Node 0.0.4a.
+- Integrates authority with worker retire/delete/force-delete safety.
+
+CLUSTER PLAYER STATE
+- Adds persisted basic player-state directory.
+- Captures UUID/name, worker, dimension, position, rotation, gamemode and OP.
+- Restores the basic record on reconnect through a different worker.
+- Uses last-known position to seed join-time population-cell/region placement.
+
+WEB UI / CONSOLE
+- Region Authority page is live.
+- World topology overlays region owners/epochs.
+- Worker detail shows authority-region count.
+- Sessions show region + authority worker/epoch.
+- Adds region ensure/transfer/freeze/unfreeze/expire console controls.
+
+SAFETY
+- Persistent world write fencing is CONTROL-PLANE ONLY in this release.
+- Do not point multiple workers at one physical world directory.
+- Basic player state does not include inventory/XP/mod attachments yet.
+
+Versions:
+- Runtime: 0.0.4a
+- Cluster Node: 0.0.4a
+- Minecraft: 1.21.1
+- NeoForge: 21.1.250
+- Java: 21

@@ -1,0 +1,25 @@
+Foundations Cluster Runtime 0.0.3a.R2
+=====================================
+Worker lifecycle + port safety revision.
+
+Fixes:
+- preflight worker ports before launch; occupied ports are skipped
+- worker restart refuses an occupied assigned port instead of crashing NeoForge
+- stored worker directories are rediscovered after manager restart
+- tagged worker JVMs can be detected as orphaned after manager failure
+
+Web UI / API additions:
+- Kill JVM
+- Retire Worker
+- Delete Worker
+- Force Delete Worker (typed confirmation in UI)
+- Orphaned Foundations JVM recovery panel
+- worker process/session/layer counts in detail drawer
+
+Safety:
+- normal Delete is blocked for running workers, players, sessions, or active layers
+- Retire drains first and waits instead of evicting sessions
+- Force Delete purges only 3a transient session/layer routing state before deleting
+- arbitrary Java processes are never treated as safe Foundations orphans
+
+Cluster Node protocol remains 0.0.3a.

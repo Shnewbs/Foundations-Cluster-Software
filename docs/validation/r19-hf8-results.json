@@ -1,0 +1,34 @@
+{
+  "package": "0.0.6a.R19-HF8",
+  "manager": "0.0.6a.R19",
+  "node": "0.0.6a.R11",
+  "gateway": "0.0.6a.R19",
+  "checks": {
+    "manager_regression": 109,
+    "support_archives": 25,
+    "node_hydration": 20,
+    "hydration_http": 13,
+    "support_http": 20,
+    "web_unit": 78,
+    "browser_api": 61,
+    "real_neoforge_workers": 9
+  },
+  "live_checks": [
+    "Two real NeoForge workers acknowledged one shared environment",
+    "Owner time/daylight/weather commands reached both workers",
+    "Saved unsupported fire restored without blocking region hydration",
+    "Fresh chest with 17 diamonds survived immediate authority transfer",
+    "Generated oak: all 6144 block states survived acknowledged authority round-trip",
+    "Real creeper blast captured and durable queue acknowledged",
+    "Hard-killed owner: survivor replayed the crater instead of original terrain",
+    "Owner shutdown retained frozen clock and thunder on the survivor",
+    "Manager restart restored environment without importing stale worker state"
+  ],
+  "limitations": [
+    "No Windows updater execution",
+    "No connected-client seamlessness test",
+    "Generated tree authority transfer is not full replica simulation acceptance",
+    "No full scheduled-tick/entity/world migration guarantee"
+  ],
+  "gateway_unchanged_from_hf7": true
+}

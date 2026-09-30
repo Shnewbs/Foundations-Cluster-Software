@@ -1,0 +1,13 @@
+{
+  "mode": "baseline",
+  "nodeVersion": "0.0.6a.R12",
+  "passed": 5,
+  "checks": [
+    "Both real NeoForge workers booted with 0.0.6a.R12",
+    "Synthetic session anchored to worker-002 while authority is worker-001; no game clients joined",
+    "Replica receives the planted stage-zero sapling through real chunk snapshots",
+    "REPRODUCED R12: replica grew real tree while authoritative worker still has the sapling",
+    "REPRODUCED R12: repeated snapshot loads do not randomly tick the playerless authority"
+  ],
+  "scope": "Real NeoForge workers and native random ticks; synthetic session/view requests; no client/physical handoff test."
+}

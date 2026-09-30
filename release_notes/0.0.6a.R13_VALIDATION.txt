@@ -1,0 +1,33 @@
+FOUNDATIONS CLUSTER 0.0.6a.R13 - VALIDATION CHECKLIST
+=====================================================
+
+Build/package checks performed before release:
+[x] Manager Java source compiles and FoundationsClusterManager.jar reports 0.0.6a.R13
+[x] Cluster Node R5 Java source compiles against the bundled NeoForge/Minecraft runtime
+[x] Node JAR contains FoundationsClusterNode.class and metadata reports 0.0.6a.R5
+[x] Foundations Gateway R13 compiles against the Velocity-compatible runtime API
+[x] Gateway JAR contains FoundationsVelocityGateway.class and R13 metadata
+[x] desktop Python modules pass py_compile
+[x] web/app.js passes node --check
+[x] updater payload contains every required changed file
+[x] updater ZIP integrity passes (performed when release ZIP is created)
+
+External install-time preflight:
+- Conduit 1.8.0 is intentionally not bundled. The updater resolves the pinned
+  release from the official tame-gg/conduit GitHub release API, downloads it,
+  verifies the Conduit marker class, and aborts before modifying the Cluster if
+  that download or validation fails.
+
+First live verification after update:
+1. Safe Suite should report Manager 0.0.6a.R13 and Node 0.0.6a.R5.
+2. Seamless Proxy Core should report a running/owned gateway with transport
+   containing "conduit-1.8.0" and "seamless".
+3. Perform one physical Player Worker Transfer between two READY workers.
+4. Confirm Manager commits anchorWorkerId + simulationWorkerId to destination.
+5. Confirm Conduit logs destination backend connect/source disconnect.
+6. On compatible same-dimension workers, verify no visible Reconfiguring screen.
+7. Run chest/BlockEntity authority round-trip and confirm contents survive.
+8. Leave the world active for several minutes and confirm BlockEntity commit
+   growth is dramatically lower than R12.
+9. Leave Desktop open through a Manager timeout/restart; it should show an API
+   error/offline state rather than crashing with "Signal source has been deleted".

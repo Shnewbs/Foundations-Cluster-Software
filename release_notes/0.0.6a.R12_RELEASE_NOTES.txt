@@ -1,0 +1,35 @@
+Foundations Cluster Runtime 0.0.6a.R12
+========================================
+
+Purpose
+-------
+Restore real player migration between workers. R11's WebUI/Desktop "Live Handoff"
+only changed simulationWorkerId while preserving anchorWorkerId, so the client stayed
+on the original Minecraft backend even though the test reported PASS.
+
+R12 changes
+-----------
+- /api/handoffs/request now performs an explicit physical backend transfer.
+- Region transfer with moveSessions=true physically migrates affected players.
+- Console `handoff request` performs a physical backend transfer.
+- Transfer sequence remains staged:
+  source snapshot -> destination preload -> final source checkpoint -> Velocity switch
+  -> session anchor + simulation commit to destination.
+- Internal anchor-preserving simulation shifts are retained for runtime use but are
+  no longer labeled or tested as player transfers.
+- WebUI/Desktop tests now PASS only after anchorWorkerId and simulationWorkerId both
+  become the destination; player-state is also checked when available.
+- Inventory round-trip checks now query the worker the player is physically connected to.
+
+Important
+---------
+A real backend migration may show Minecraft's Configuration/Reconfiguring phase. R11
+avoided that by not moving the client at all. Eliminating that visible phase while still
+physically changing independent backend servers requires a deeper protocol/session bridge;
+it cannot be claimed by simply preserving the old anchor.
+
+Unchanged
+---------
+- Cluster Node: 0.0.6a.R4
+- World identity schema: 2
+- Persistent world/player/runtime data is preserved.

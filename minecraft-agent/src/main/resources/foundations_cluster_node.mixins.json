@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.foundations.cluster.node.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ChunkMutationMixin",
+    "BlockEntitySealMixin",
+    "GrowthTickMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

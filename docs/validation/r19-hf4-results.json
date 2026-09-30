@@ -1,0 +1,20 @@
+{
+  "release": "0.0.6a.R19-HF4",
+  "baseline": "0.0.6a.R19-HF3",
+  "reproduced_baseline_failure": "Destination configuration differs: neoforge:frozen_registry_sync_start (entry 0)",
+  "actual_user_payload_equality_known": false,
+  "registry_checks": 48,
+  "retained_handshake_checks": 81,
+  "patched_jar_handshake_checks": 129,
+  "web_handoff_cases": 9,
+  "web_acceptance_cases": 24,
+  "web_button_cases": 16,
+  "manager_assertions": 89,
+  "java_target": 21,
+  "live_client_tested": false,
+  "windows_tested": false,
+  "updater_script_changed": false,
+  "region_routing_fixed": false,
+  "advancement_file_lock_fixed": false,
+  "neoforge_sources_sha256": "a2811d794544ec67dc3fa43b900158f058ea534881ba1c160373554384311a0d"
+}

@@ -1,0 +1,12 @@
+{
+  "passed": 6,
+  "checks": [
+    "R18 to R19 apply and payload hashes",
+    "Configuration, security, journals and worlds preserved",
+    "Template and existing worker normalized to Node R9",
+    "Every R19 Conduit overlay class installed exactly",
+    "Explicit rollback restores every original file",
+    "Forced mid-update failure rolls all mutations back"
+  ],
+  "limits": "Linux PowerShell; Windows Get-CimInstance process discovery mocked. No real installation was touched."
+}

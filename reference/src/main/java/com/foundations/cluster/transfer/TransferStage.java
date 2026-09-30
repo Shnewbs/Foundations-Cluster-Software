@@ -1,0 +1,15 @@
+package com.foundations.cluster.transfer;
+
+public enum TransferStage {
+    PREPARING,
+    SOURCE_FLUSHED,
+    DESTINATION_INVALIDATED,
+    SNAPSHOT_INSTALLED,
+    VERIFIED,
+    AUTHORITY_COMMITTED,
+    DESTINATION_ACTIVATED,
+    SOURCE_DEMOTED,
+    COMMITTED,
+    ROLLED_BACK,
+    RECOVERY_REQUIRED
+}

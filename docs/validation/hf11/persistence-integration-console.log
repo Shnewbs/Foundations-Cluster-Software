@@ -1,0 +1,10 @@
+PASS Two real NeoForge workers acknowledged one shared environment
+PASS Owner time/daylight/weather commands reached both workers
+PASS Saved unsupported fire restored without blocking region hydration
+PASS Fresh chest with 17 diamonds survived immediate authority transfer
+PASS Generated oak: all 6144 block states survived acknowledged authority round-trip
+PASS Real creeper blast captured and durable queue acknowledged
+PASS Hard-killed owner: survivor replayed the crater instead of original terrain
+PASS Owner shutdown retained frozen clock and thunder on the survivor
+PASS Manager restart restored environment without importing stale worker state
+Persistence integration: PASS 9 checks

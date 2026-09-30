@@ -1,0 +1,58 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.5a.R7.R5
+Generic BlockEntity Persistence
+
+R7.R5 extends R7.R4 restart-durable block-state persistence to the complete
+Minecraft BlockEntity payload. This is generic support, not a hard-coded chest
+compatibility list.
+
+WHAT IS NEW
+- Full BlockEntity saveWithFullMetadata() payload capture on NeoForge 1.21.1.
+- Opaque manager-owned durable BlockEntity WAL + compacted snapshot.
+- Full BlockEntity payloads in authoritative CHUNK_SNAPSHOT hydration.
+- BLOCK_ENTITY_REQUEST / BLOCK_ENTITY_DELTA write-through between session-anchor
+  replicas and the current Region Authority owner.
+- Durable replay when a worker starts or acquires Region Authority.
+- Tombstones prevent removed/replaced containers from resurrecting stale data.
+- SHA-256 payload fingerprints suppress unchanged writes.
+- Dirty-chunk scanning is budgeted and rotating to limit runtime cost.
+- Chunk invalidation clears cached BlockEntity fingerprints so the next
+  authoritative snapshot fully rehydrates state.
+- Newly acquired authority pauses dirty BlockEntity scanning until the durable
+  journal replay completes, preventing stale local disk state from winning.
+- Data-plane max frame default increased to 16 MiB; per-BlockEntity payload
+  guard defaults to 8 MiB.
+- Dashboard exposes BlockEntity persistence count/revision/WAL/payload metrics.
+
+MOD COMPATIBILITY
+Any vanilla or modded BlockEntity that persists its state through normal
+Minecraft/NeoForge BlockEntity serialization is handled generically. The full
+serialized payload includes normal BlockEntity NBT, data components, and
+NeoForge attachment data exposed through the standard save path. This can cover
+inventories, machine progress, settings, ownership metadata, fluids/energy, and
+other mod-specific state when the mod correctly serializes those values.
+
+LAYERS
+Layers do not create separate persistent container state. All layers resolve to
+the same authoritative Region state.
+
+PHYSICAL WORLD SAFETY
+Workers KEEP independent writable world folders. Never point multiple worker
+JVMs at the same writable Minecraft world folder.
+
+NOT YET CLAIMED BY R7.R5
+- arbitrary world entities/mobs/dropped items
+- POI persistence
+- scheduled tick migration
+- arbitrary world-level SavedData outside BlockEntities
+- mod data stored in external/custom stores that bypass standard BlockEntity or
+  NeoForge attachment persistence
+
+PRIMARY ACCEPTANCE TEST
+1. Put distinct items in a vanilla chest and a modded storage/machine block.
+2. Move through workers/layers and verify the same contents/state.
+3. Modify contents/state while anchored on another worker.
+4. Return and verify newest state.
+5. Shut the ENTIRE cluster down cleanly.
+6. Restart and verify all contents/state survived.
+7. Remove the container, place a new one at the same coordinates, restart, and
+   verify the old inventory does not resurrect.

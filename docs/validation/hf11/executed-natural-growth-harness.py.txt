@@ -1,0 +1,148 @@
+"""Two real NeoForge 21.1.250 workers, synthetic Manager session/view requests.
+Tree growth comes from native random ticks. No /place feature, bonemeal, or direct sapling tick calls.
+Only disposable test worlds. No connected game client or physical handoff is tested.
+"""
+from pathlib import Path
+import os,subprocess,tempfile,shutil,time,json,urllib.request,urllib.error,urllib.parse,http.cookiejar,re,base64,threading,sys
+version=sys.argv[1];mode='baseline' if version.endswith('R12') else 'fixed'
+root=Path('/mnt/data/treefix/work/Cluster');template=Path('/mnt/data/treefix/deps/Cluster/server-template');out=Path('/mnt/data/treefix/live-'+mode);out.mkdir(exist_ok=True)
+home=Path(tempfile.mkdtemp(prefix='foundations-growth-'+mode+'-'));(home/'config').mkdir();(out/'fixture-path.txt').write_text(str(home))
+base='http://127.0.0.1:18776'; cp=':'.join(str(root/x) for x in ['cluster-manager/build/test-classes','cluster-manager/build/FoundationsClusterManager.jar','cluster-manager/lib/bcprov.jar'])
+(home/'config/cluster.properties').write_text('web.bind=127.0.0.1\nweb.port=18776\nstartup.autoStartWorkers=false\ntemplate.autoBootstrap=false\nnodeAgent.required=false\ngateway.enabled=false\nworld.seed=1234\nworld.identity.enforce=false\nworld.environment.enabled=false\nlayer.autoSplit=false\nlayer.autoMerge=false\nregion.autoFailover=false\nregion.leaseSeconds=15\n')
+creds=home/'qa.json';subprocess.run(['java','-cp',cp,'com.foundations.cluster.manager.QaCredentials',str(home),str(creds)],check=True,capture_output=True);token=json.loads(creds.read_text())['agent'];creds.unlink()
+ops=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()));procs=[];handles=[];checks=[]
+def api(path,data=None,agent=False):
+ headers={}
+ if agent:headers['X-Foundations-Agent-Token']=token
+ if data is not None:headers['Content-Type']='application/json'
+ req=urllib.request.Request(base+path,data=None if data is None else json.dumps(data).encode(),headers=headers)
+ try:
+  with ops.open(req,timeout=12) as resp:return json.load(resp)
+ except urllib.error.HTTPError as e:raise RuntimeError(f'{path}: HTTP {e.code}: {e.read().decode()}')
+def wait(fn,why,timeout=90):
+ end=time.monotonic()+timeout;last=None
+ while time.monotonic()<end:
+  try:
+   result=fn()
+   if result:return result
+  except (ConnectionError,urllib.error.URLError,TimeoutError,KeyError,RuntimeError,AssertionError) as e:last=e
+  time.sleep(.3)
+ raise AssertionError(why+(' | '+str(last) if last else ''))
+def start(cmd,folder,env,path):
+ log=path.open('a');handles.append(log);p=subprocess.Popen(cmd,cwd=folder,env={**os.environ,**env},stdin=subprocess.PIPE,stdout=log,stderr=subprocess.STDOUT,text=True);procs.append(p);return p
+workers={}
+def log(w):return (out/(w+'.log')).read_text(errors='replace')
+def command(w,c):workers[w].stdin.write(c+'\n');workers[w].stdin.flush()
+def fresh(w,c,token,timeout=10):
+ before=len(log(w));command(w,c);return wait(lambda:(s if token in(s:=log(w)[before:]) else None),'No fresh console: '+w+' '+c,timeout)
+def probe(w):
+ s=fresh(w,'foundations_region_probe 32 280 32 47 303 47','FOUNDATIONS_REGION_PROBE')
+ m=re.search(r'sha256=([a-f0-9]{64}) blocks=(\d+) logs=(\d+) leaves=(\d+)',s);return m.groups()
+def check(s):checks.append(s);print('PASS',s,flush=True)
+def snapshot_request(session,owner,epoch):
+ return api('/api/agent/dataplane/publish',{'kind':'CHUNK_REQUEST','sourceWorkerId':session['workerId'],'targetWorkerId':owner,'sessionId':session['sessionId'],'playerId':session['playerId'],'worldId':'foundations','dimensionId':'minecraft:overworld','regionId':session['regionId'],'authorityEpoch':epoch,'payload':'2|2|292|16'},True)
+def journal():
+ result=[]
+ for file in (home/'runtime').glob('persistent-blocks*'):
+  if file.is_file():result.append(file.read_text(errors='replace'))
+ return '\n'.join(result)
+try:
+ manager=start(['java','-cp',cp,'com.foundations.cluster.manager.Main'],home,{'FOUNDATIONS_CLUSTER_HOME':str(home)},out/'manager.log')
+ wait(lambda:api('/api/health'),'Manager boot',25)
+ api('/api/auth/setup',{'username':'fixture','password':'growth-fixture-local-only-2026','remember':False})
+ for i in [1,2]:
+  wid=f'worker-00{i}';folder=home/wid;folder.mkdir();(folder/'mods').mkdir();(folder/'libraries').symlink_to(template/'libraries',target_is_directory=True)
+  shutil.copyfile(template/'eula.txt',folder/'eula.txt');shutil.copyfile(root/f'minecraft-agent/build/libs/foundations_cluster_node-{version}.jar',folder/f'mods/foundations_cluster_node-{version}.jar');shutil.copyfile('/mnt/data/treefix/growth-fixture.jar',folder/'mods/growth-fixture.jar')
+  (folder/'server.properties').write_text(f'server-ip=127.0.0.1\nserver-port={28900+i}\nonline-mode=false\nenforce-secure-profile=false\nlevel-seed=1234\nlevel-type=minecraft:flat\ngenerate-structures=false\nview-distance=2\nsimulation-distance=2\nmax-players=4\n')
+  workers[wid]=start(['java','-Xms128M','-Xmx1024M','@libraries/net/neoforged/neoforge/21.1.250/unix_args.txt','nogui'],folder,{'FOUNDATIONS_CLUSTER_MANAGER_URL':base,'FOUNDATIONS_CLUSTER_AGENT_TOKEN':token,'FOUNDATIONS_CLUSTER_WORKER_ID':wid,'FOUNDATIONS_CLUSTER_WORKER_PORT':str(28900+i),'FOUNDATIONS_PERSISTENCE_ENABLED':'true','FOUNDATIONS_REMOTE_TICK_TTL_MILLIS':'5000'},out/(wid+'.log'))
+ wait(lambda:len([w for w in api('/api/workers')['workers'] if w.get('ready')])==2,'Workers ready',160)
+ check('Both real NeoForge workers booted with '+version)
+ for wid in workers:
+  fresh(wid,'gamerule randomTickSpeed 0','randomTickSpeed')
+  for c in ['gamerule doDaylightCycle false','gamerule doWeatherCycle false','gamerule doMobSpawning false','time set day','weather clear']:command(wid,c)
+ session=api('/api/sessions/place',{'playerId':'GrowthFixture','sessionId':'growth-fixture','worldId':'foundations','dimensionId':'minecraft:overworld','cellX':0,'cellZ':0})
+ anchor=session['workerId'];owner=next(w for w in workers if w!=anchor);region=session['regionId'];encoded=urllib.parse.quote(region,safe='')
+ def ready(w):
+  s=fresh(w,'foundations_region_ready "'+region+'"','FOUNDATIONS_REGION_READY');return 'FOUNDATIONS_REGION_READY true' in s
+ wait(lambda:ready(anchor),'Initial authority hydration',40)
+ api('/api/regions/'+encoded+'/transfer',{'workerId':owner})
+ wait(lambda:ready(owner),'Remote authority hydration',40)
+ epoch=next(r['epoch'] for r in api('/api/regions')['regions'] if r['id']==region)
+ time.sleep(3)
+ check('Synthetic session anchored to '+anchor+' while authority is '+owner+'; no game clients joined')
+ # Interior chunk, sky-level dirt and stage-zero sapling. Setup writes must settle first.
+ fresh(owner,'setblock 40 282 40 minecraft:dirt','Changed the block')
+ fresh(owner,'setblock 40 283 40 minecraft:oak_sapling[stage=0]','Changed the block')
+ snapshot_request(session,owner,epoch)
+ def mirrored():
+  snapshot_request(session,owner,epoch)
+  time.sleep(.5)
+  return probe(anchor)==probe(owner)
+ wait(mirrored,'Initial sapling reached physical replica',25)
+ check('Replica receives the planted stage-zero sapling through real chunk snapshots')
+ fresh(anchor,'fixture_tick_hold 2 2 true','FIXTURE_TICK_HOLD_OK')
+ fresh(anchor,'gamerule randomTickSpeed 4096','randomTickSpeed');time.sleep(4)
+ replica_before=probe(anchor);owner_before=probe(owner)
+ if mode=='baseline':
+  assert int(replica_before[2])>0 and int(owner_before[2])==0,(replica_before,owner_before)
+  check('REPRODUCED R12: replica grew real tree while authoritative worker still has the sapling')
+ else:
+  assert int(replica_before[2])==0 and int(owner_before[2])==0,(replica_before,owner_before)
+  s=fresh(anchor,'foundations_growth_status 40 283 40','FOUNDATIONS_GROWTH')
+  assert 'role=REPLICA' in s and int(re.search(r'suppressedTicks=(\d+)',s).group(1))>0,s
+  check('R13 blocks replica-side natural random growth even with a native forced-ticking ticket')
+ fresh(anchor,'gamerule randomTickSpeed 0','randomTickSpeed')
+ fresh(owner,'gamerule randomTickSpeed 4096','randomTickSpeed')
+ if mode=='baseline':
+  for _ in range(6):snapshot_request(session,owner,epoch);time.sleep(1)
+  assert int(probe(owner)[2])==0
+  check('REPRODUCED R12: repeated snapshot loads do not randomly tick the playerless authority')
+ else:
+  def grown():
+   snapshot_request(session,owner,epoch);return int(probe(owner)[2])>0
+  wait(grown,'Native sapling growth did not run on remote authority',40)
+  fresh(owner,'gamerule randomTickSpeed 0','randomTickSpeed');time.sleep(2)
+  oak=probe(owner);assert int(oak[2])>0 and int(oak[3])>0,oak
+  check('R13 grows stage-zero sapling into logs/leaves via native random ticks on the playerless authority')
+  def durable():
+   w=next(w for w in api('/api/workers')['workers'] if w['id']==owner)
+   return w['pendingWrites']==0 and w['failedWrites']==0 and w['lastDurableWrite']>0
+  wait(durable,'Growth durable writes pending',35)
+  # Examine actual manager-owned persistence, not only worker counters.
+  decoded=[]
+  for line in journal().splitlines():
+   for cell in line.split('\t'):
+    try:decoded.append(base64.urlsafe_b64decode(cell+'='*(-len(cell)%4)).decode())
+    except Exception:pass
+  assert any('minecraft:oak_log' in s for s in decoded),'No tree logs in Manager journal'
+  assert any('minecraft:oak_leaves' in s for s in decoded),'No tree leaves in Manager journal'
+  check('Manager journal contains naturally generated oak logs and leaves; durable queue is acknowledged')
+  def matching():
+   snapshot_request(session,owner,epoch);time.sleep(.5);return probe(anchor)==oak
+  wait(matching,'Replica tree snapshot does not match authority',25)
+  check('Replica matches all 6144 sampled block states after natural growth, without ownership transfer')
+  s=fresh(owner,'foundations_growth_status 40 283 40','FOUNDATIONS_GROWTH');(out/'growth-diagnostic.txt').write_text(s)
+  assert 'tickTicket=true' in s and int(re.search(r'chunkTicks=(\d+)',s).group(1))>0
+  assert int(re.search(r'chunkCaptured=(\d+)',s).group(1))>2
+  check('Read-only growth diagnostics expose active ticket, natural chunk ticks and captured mutations')
+  # No more requests: ticket expires, rather than force-loading forever.
+  time.sleep(7)
+  s=fresh(owner,'foundations_growth_status 40 283 40','FOUNDATIONS_GROWTH');assert 'tickTicket=false' in s,s
+  check('Expired remote view releases its transient forced-ticking ticket')
+  for destination in [anchor,owner]:
+   api('/api/regions/'+encoded+'/transfer',{'workerId':destination})
+   wait(lambda:ready(destination),'Tree transfer authority readiness',40)
+   assert probe(destination)==oak,'Natural tree changed during authority transfer'
+  check('Naturally grown tree survives acknowledged authority A -> B -> A replay')
+ result={'mode':mode,'nodeVersion':version,'passed':len(checks),'checks':checks,'scope':'Real NeoForge workers and native random ticks; synthetic session/view requests; no client/physical handoff test.'}
+ (out/'results.json').write_text(json.dumps(result,indent=2));print(json.dumps(result,indent=2),flush=True)
+finally:
+ for p in reversed(procs):
+  if p.poll() is None:
+   try:p.stdin.write('stop\n');p.stdin.flush();p.wait(timeout=15)
+   except Exception:p.terminate()
+   try:p.wait(timeout=8)
+   except Exception:p.kill();p.wait()
+ for f in handles:f.close()
+ # Keep only disposable fixture locally for postmortem; never package worlds/secrets.
+ print('Fixture location:',home,flush=True)

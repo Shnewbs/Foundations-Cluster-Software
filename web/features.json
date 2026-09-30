@@ -1,0 +1,345 @@
+[
+  {
+    "name": "Automatic support ZIPs",
+    "status": "implemented",
+    "phase": "Operations",
+    "detail": "One-click runtime/log capture, opt-in schedule or Test Lab failure capture, size limits, manifest checksums, retention and authenticated downloads. Credentials and profiles excluded.",
+    "next": "Enable in Diagnostics; review before sharing. Full world backups still require stopping the cluster."
+  },
+  {
+    "name": "Single-machine orchestration",
+    "status": "implemented",
+    "phase": "Local cluster",
+    "detail": "Manager, reusable worker IDs/ports, template installation, launch and supervision.",
+    "next": "Validate launchers on Windows with JDK 21."
+  },
+  {
+    "name": "Manual worker controls",
+    "status": "implemented",
+    "phase": "Local cluster",
+    "detail": "Start, warm start, drain, cancel, maintenance, stop, restart, kill, retirement and deletion.",
+    "next": "Deletion keeps existing explicit safeguards; use test worlds."
+  },
+  {
+    "name": "Pinned capacity",
+    "status": "implemented",
+    "phase": "Operations",
+    "detail": "Persistent worker pin prevents automatic scale-down while leaving manual controls available.",
+    "next": "Use worker drawer \u2192 Pin online."
+  },
+  {
+    "name": "Named worker profiles",
+    "status": "partial",
+    "phase": "Capacity",
+    "detail": "Default heap/JVM profile and memory reservation are configurable.",
+    "next": "Multiple named templates, affinity, priority and NUMA placement remain planned."
+  },
+  {
+    "name": "Manual / assisted / automatic scaling",
+    "status": "implemented",
+    "phase": "Capacity",
+    "detail": "Sustain windows, cooldowns, RAM budgets, consolidation and operator approval.",
+    "next": "Production scaling still depends on live migration acceptance."
+  },
+  {
+    "name": "Warm spares",
+    "status": "implemented",
+    "phase": "Capacity",
+    "detail": "Warm worker creation and configurable warm capacity targets.",
+    "next": "Predictive demand forecasting is planned."
+  },
+  {
+    "name": "Cluster performance history",
+    "status": "implemented",
+    "phase": "Observability",
+    "detail": "Bounded 5-second, minute and hourly tiers; graph ranges through seven days.",
+    "next": "History accumulates in memory and resets on Manager restart."
+  },
+  {
+    "name": "Per-worker history",
+    "status": "implemented",
+    "phase": "Observability",
+    "detail": "One hour of bounded MSPT, percentile, heap, CPU, players and chunk telemetry.",
+    "next": "Open a worker \u2192 Metrics. GC pause histograms and allocation rates need additional instrumentation."
+  },
+  {
+    "name": "Local host health",
+    "status": "implemented",
+    "phase": "Observability",
+    "detail": "Host CPU, available RAM, swap, storage, Manager heap and runtime.",
+    "next": "Unavailable OS counters remain explicitly unavailable."
+  },
+  {
+    "name": "Extended platform counters",
+    "status": "planned",
+    "phase": "Observability",
+    "detail": "Per-core CPU, network rate, disk latency, temperatures and file descriptors.",
+    "next": "Add platform adapters without blocking Minecraft ticks."
+  },
+  {
+    "name": "Alerts and acknowledgements",
+    "status": "implemented",
+    "phase": "Operations",
+    "detail": "Live incidents, severity thresholds, persisted acknowledgements and resolved-incident clearing.",
+    "next": "External notification channels are not connected."
+  },
+  {
+    "name": "Unified console / logs / audit",
+    "status": "implemented",
+    "phase": "Operations",
+    "detail": "Manager/worker consoles, search, pause, downloads, CSV export and audited admin mutations.",
+    "next": "Long-term structured log retention/export pipelines remain planned."
+  },
+  {
+    "name": "Diagnostic summaries",
+    "status": "implemented",
+    "phase": "Operations",
+    "detail": "Download an allowlisted ZIP of component health, host measurements and transfer metadata.",
+    "next": "Raw logs, secrets, world files and player profiles are excluded."
+  },
+  {
+    "name": "Consistent offline backups",
+    "status": "implemented",
+    "phase": "Recovery",
+    "detail": "Stopped-cluster backup tool, SHA-256 manifest and archive verification.",
+    "next": "Stop the Manager before taking a backup; live snapshots are not implemented."
+  },
+  {
+    "name": "Transactional program updater",
+    "status": "implemented",
+    "phase": "Recovery",
+    "detail": "Portable folder selection, stopped-process checks, checksummed payload, backups and rollback.",
+    "next": "Requires Windows execution acceptance on the target machine."
+  },
+  {
+    "name": "WebUI mockup layout",
+    "status": "implemented",
+    "phase": "Administration",
+    "detail": "Dark dashboard, six overview metrics, load graph, distribution, worker table, quick actions and events.",
+    "next": "Live ownership map replaces fictional terrain imagery."
+  },
+  {
+    "name": "Operator quality of life",
+    "status": "implemented",
+    "phase": "Administration",
+    "detail": "Ctrl+K search, deep links, sort/export, dirty-form protection, responsive layout, focus trapping and stale-data indicators.",
+    "next": "Use Feature Status to inspect every roadmap area."
+  },
+  {
+    "name": "World ownership map",
+    "status": "implemented",
+    "phase": "World",
+    "detail": "Coordinate-based region view, dimension filter, zoom, pan and cell inspection.",
+    "next": "A terrain tile renderer is not yet connected."
+  },
+  {
+    "name": "Population layer planner",
+    "status": "acceptance",
+    "phase": "World",
+    "detail": "Layer cells, lease placement, party affinity and split/merge foundations exist.",
+    "next": "Validate large populations and game entity visibility."
+  },
+  {
+    "name": "Persistent bases across layers",
+    "status": "partial",
+    "phase": "World",
+    "detail": "Blocks and BlockEntities use one-writer authority and journals.",
+    "next": "Persistent entities, machines, mod semantics and complete replica tick suppression require further work."
+  },
+  {
+    "name": "Region authority / epochs",
+    "status": "acceptance",
+    "phase": "World",
+    "detail": "Leases, fencing, recovery, transfer and authority map are implemented.",
+    "next": "Prove no duplicate writers under real crash and load tests."
+  },
+  {
+    "name": "Region snapshot transfers",
+    "status": "partial",
+    "phase": "World",
+    "detail": "Checksummed snapshot/install coordinator exists in the reference module.",
+    "next": "Integrate and acceptance-test full region files across live workers."
+  },
+  {
+    "name": "BlockEntity persistence",
+    "status": "acceptance",
+    "phase": "World",
+    "detail": "R9 flushes host blocks and current BlockEntity payloads before planned ownership changes. A fresh chest with 17 diamonds passed an immediate transfer between real NeoForge workers.",
+    "next": "TFC machines, mod-specific state and long-running churn still need acceptance."
+  },
+  {
+    "name": "Data plane / replicas",
+    "status": "acceptance",
+    "phase": "World",
+    "detail": "Chunk/block relay, fencing and deduplication exist.",
+    "next": "Test stale publisher behavior, saturation and replica consistency."
+  },
+  {
+    "name": "Player state / profile restore",
+    "status": "acceptance",
+    "phase": "Players",
+    "detail": "Capture, preload, final snapshot and profile preparation are implemented.",
+    "next": "Resolve the Windows advancement/profile sharing violation and validate inventory, attachments and profile capture under repeated transfers."
+  },
+  {
+    "name": "Physical backend migration",
+    "status": "acceptance",
+    "phase": "Networking",
+    "detail": "Explicit transfers require destination readiness and real backend movement.",
+    "next": "Run both directions with a connected client; confirm anchor and simulation."
+  },
+  {
+    "name": "Migration headroom",
+    "status": "implemented",
+    "phase": "Networking",
+    "detail": "Reject stale, full, unhealthy, high-MSPT and over-heap destinations.",
+    "next": "Reserve host memory in Scaling and tune placement.maxHeapPercent."
+  },
+  {
+    "name": "Seamless NeoForge switching",
+    "status": "partial",
+    "phase": "Networking",
+    "detail": "R19 captures completed client login replies and replays only verified matching destination tasks; unknown or changed configuration aborts explicitly.",
+    "next": "Real joined-client A\u2192B\u2192A acceptance is still required; normal physical reconfiguration remains the default."
+  },
+  {
+    "name": "Transfer evidence timeline",
+    "status": "implemented",
+    "phase": "Networking",
+    "detail": "Correlated gateway switch stages, elapsed time, commit/abort diagnostics and exports.",
+    "next": "Packet-level bridge logs remain gateway-side; client seamlessness requires observation."
+  },
+  {
+    "name": "Graceful evacuation / rolling restart",
+    "status": "acceptance",
+    "phase": "Recovery",
+    "detail": "Migration-aware stop waits for players and authority before exit.",
+    "next": "Validate successful migration, timeout abort and last-worker handling."
+  },
+  {
+    "name": "Emergency crash recovery",
+    "status": "acceptance",
+    "phase": "Recovery",
+    "detail": "Backend failure checks, quarantine, profile preparation and redirects.",
+    "next": "Validate hard crash behavior and repeat failure limits in live cluster."
+  },
+  {
+    "name": "Intentional shutdown",
+    "status": "implemented",
+    "phase": "Recovery",
+    "detail": "Global gate suppresses failover, automatic planning and new topology mutations before workers stop.",
+    "next": "Run a joined-client shutdown test to verify the proxy path."
+  },
+  {
+    "name": "Java toolchain isolation",
+    "status": "implemented",
+    "phase": "Build",
+    "detail": "JDK 21 discovery for builds; isolated Java 25 gateway runtime retained.",
+    "next": "Clean-machine Windows provisioning still requires acceptance."
+  },
+  {
+    "name": "Administrator security",
+    "status": "implemented",
+    "phase": "Security",
+    "detail": "Argon2id login, encrypted vault, authenticated APIs, same-origin mutation checks and audit.",
+    "next": "Default binding remains loopback; remote TLS belongs at the reverse proxy."
+  },
+  {
+    "name": "Granular administrative roles",
+    "status": "planned",
+    "phase": "Security",
+    "detail": "Current runtime has one administrator role.",
+    "next": "Add Viewer, Operator, Administrator, Forensics and Owner enforcement server-side."
+  },
+  {
+    "name": "Economy / Framework boundary",
+    "status": "partial",
+    "phase": "Integrations",
+    "detail": "Economy remains separate from worker orchestration.",
+    "next": "No Economy health or ledger provider is included in this source package."
+  },
+  {
+    "name": "Native desktop client",
+    "status": "partial",
+    "phase": "Administration",
+    "detail": "New standard-library Tkinter client supplies authenticated worker controls, live summary and logs without PySide dependencies.",
+    "next": "Desktop window behavior needs Windows acceptance; full Test Lab and topology administration use the WebUI."
+  },
+  {
+    "name": "Remote worker hosts",
+    "status": "planned",
+    "phase": "Distributed",
+    "detail": "Existing orchestration currently owns local processes.",
+    "next": "Build authenticated remote node agent, resource inventory and host drain."
+  },
+  {
+    "name": "Shared SQL / messaging providers",
+    "status": "planned",
+    "phase": "Distributed",
+    "detail": "Local authoritative state stores are preserved.",
+    "next": "Add transactional metadata provider, coordination and storage abstraction."
+  },
+  {
+    "name": "Cross-host world transfer",
+    "status": "planned",
+    "phase": "Distributed",
+    "detail": "Reference snapshot structures establish the transfer model.",
+    "next": "Add authenticated install endpoints, fencing and interrupted-transfer recovery."
+  },
+  {
+    "name": "High availability",
+    "status": "planned",
+    "phase": "Distributed",
+    "detail": "Manager and gateway are currently single instances.",
+    "next": "Add durable leadership, redundant gateways and replicated control-plane state."
+  },
+  {
+    "name": "Seamless cell boundaries",
+    "status": "partial",
+    "phase": "World",
+    "detail": "Logical simulation movement exists separately from explicit physical migration.",
+    "next": "Validate physical handover, visibility, persistent entities and no lost writes."
+  },
+  {
+    "name": "Test Lab",
+    "status": "acceptance",
+    "phase": "Validation",
+    "detail": "Safe and live suites, handoff, inventory, chest and lifecycle checks are preserved.",
+    "next": "Local tests cannot certify joined-client protocol or real Minecraft rendering."
+  },
+  {
+    "name": "Shared overworld time and weather",
+    "status": "acceptance",
+    "phase": "World consistency",
+    "detail": "One leased clock/weather owner, follower acknowledgements and persisted checkpoints. Verified with two headless NeoForge workers, owner loss and Manager restart.",
+    "next": "Observe live client transitions; add TFC calendar/climate adapters and cluster-wide sleep voting."
+  },
+  {
+    "name": "Terrain mutation journaling",
+    "status": "acceptance",
+    "phase": "World",
+    "detail": "R9 captures authoritative chunk block changes, including creeper damage. A real blast survived source hard-kill after Manager save acknowledgement.",
+    "next": "Non-authoritative replica mutations and mods bypassing chunk mutation hooks need further coverage; unacknowledged writes can still be lost."
+  },
+  {
+    "name": "Confirmed saves before ownership transfer",
+    "status": "implemented",
+    "phase": "Recovery",
+    "detail": "The source seals its region, flushes terrain and BlockEntities, and confirms durability before ownership changes. Worker-instance and epoch checks reject stale acknowledgements.",
+    "next": "Failed or timed-out saves keep source ownership; inspect Save Health and cancel a pending save if needed."
+  },
+  {
+    "name": "Save health and transfer recovery",
+    "status": "implemented",
+    "phase": "Operations",
+    "detail": "Diagnostics shows fresh pending/failed writes and last durable save, support-summary export and normal-transfer recovery. Test Lab checks save health.",
+    "next": "The normal-transfer setting takes effect after a full cluster restart. Failed persistence queues require inspection."
+  },
+  {
+    "name": "Guarded client handshake replay",
+    "status": "partial",
+    "phase": "Networking",
+    "detail": "Bounded per-client in-memory transcripts, verified NeoForge network map equivalence, explicit mismatch reasons and a cooldown for repeated failed destinations.",
+    "next": "Custom tasks, large transcripts and different registry/config bytes reject conservatively; client-visible seamlessness remains unproven."
+  }
+]

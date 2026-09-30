@@ -1,0 +1,61 @@
+FOUNDATIONS CLUSTER RUNTIME 0.0.6a.R14
+======================================
+
+Purpose
+-------
+R14 is a corrective stabilization revision for the R13 seamless-proxy path.
+
+R13's physical player migration is preserved unchanged. The R13 failure was in
+the proxy runtime launch: Conduit 1.8.0 is compiled for Java 25 (class-file
+version 69), while Foundations Cluster intentionally runs its Manager and
+NeoForge 1.21.1 workers on Java 21 (class-file version 65).
+
+R14 gives the gateway its own isolated Java 25 runtime instead of changing the
+Java version used by Minecraft or the Cluster Manager.
+
+What changes
+------------
+- Manager: 0.0.6a.R14
+- Cluster Node: 0.0.6a.R6
+- Foundations Gateway plugin: 0.0.6a.R14
+- Proxy core: Conduit 1.8.0
+- Gateway-only runtime: Temurin Java 25 under velocity\runtime\java25
+- Manager and Minecraft workers remain on Java 21
+- Gateway bootstrap validates Java 25 before Conduit is launched
+- Missing gateway Java 25 can be restored automatically from the official
+  Adoptium API
+- R13 physical transfer sequence is not changed
+- R13 Conduit seamless-switch settings remain enabled
+- BlockEntity unload handling no longer republishes an entire chunk
+
+BlockEntity persistence correction
+----------------------------------
+The R13 scanner/coalescer settings were not the main cause of the remaining
+write storm. Chunk unload handling still called the BlockEntity scanner with
+force=true, immediately publishing every BlockEntity in every unloading chunk.
+
+R14 changes unload handling to:
+1. inspect the unloading chunk for changed fingerprints,
+2. queue only actual mutations,
+3. flush only pending mutations for that chunk.
+
+This preserves final durability while allowing the 5-second quiet coalescer and
+5-minute hot-entity checkpoint to work as intended.
+
+Updater behavior
+----------------
+The portable updater can remain outside the Cluster directory. It asks for the
+Cluster root, verifies 0.0.6a.R13, requires Manager/Gateway/workers to be fully
+stopped, creates a timestamped backup, applies R14, then runs the target gateway
+bootstrap to install/validate the isolated Java 25 runtime.
+
+The Java 25 download is fetched from the official Adoptium API. The package
+checksum supplied by Adoptium is verified before installation.
+
+Preserved data
+--------------
+The updater does NOT replace worlds, persistence journals, session state,
+player profiles, security vaults, or arbitrary operator configuration.
+
+R14 bootstrap hotfix 2:
+- Java 25 validation now reads the Temurin runtime release metadata and uses ProcessStartInfo as a fallback, avoiding Windows PowerShell native stderr parsing false negatives.

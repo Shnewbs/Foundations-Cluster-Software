@@ -1,0 +1,10 @@
+Foundations Cluster Runtime 0.0.5a.R2
+
+Gateway bootstrap hotfix
+
+- Fixes Velocity bootstrap failure caused by requesting retired/empty 3.4.0-SNAPSHOT builds from PaperMC Fill.
+- Pins the runtime download to released stable Velocity 3.4.0, matching the Java 21 Foundations 0.0.5a gateway target.
+- Accepts both root-array and object-wrapped Fill v3 build responses.
+- Rejects/removes incomplete velocity.jar downloads.
+- Gateway UI now reports VELOCITY / FAILED after bootstrap failure instead of remaining stuck on STARTING.
+- Cluster Node remains 0.0.5a; no Node rebuild is required for this revision.

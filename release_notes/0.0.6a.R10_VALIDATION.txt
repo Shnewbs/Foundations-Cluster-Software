@@ -1,0 +1,23 @@
+R10 validation performed before packaging
+==========================================
+PASS - cluster-manager Java build
+PASS - built Manager JAR contains 0.0.6a.R10
+PASS - WebUI app.js syntax check (node --check)
+PASS - Desktop Python syntax compile
+PASS - updater payload paths verified
+
+Runtime validation after update
+===============================
+1. Start the cluster and connect one player.
+2. Confirm two or more Manager-controlled workers are READY/ACTIVE.
+3. Note the player's current Anchor and Simulation Target.
+4. Click Restart on the CURRENT ANCHOR worker.
+5. Expected log order:
+   Graceful Restart requested...
+   Evacuation handoff requested...
+   Evacuation handoff COMMITTED...
+   Graceful Restart evacuation complete... Minecraft stop sent
+   worker-XXX stopped cleanly
+   Graceful Restart relaunch requested...
+   Agent registered: worker-XXX ... managed
+6. Expected Velocity behavior: player changes backend during evacuation and is NOT disconnected.

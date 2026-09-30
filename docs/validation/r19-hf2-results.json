@@ -1,0 +1,11 @@
+{
+  "release": "0.0.6a.R19-HF2",
+  "baseline_failure": "Manager expects 0.0.6a.R8 but packaged Node is 0.0.6a.R9",
+  "upgrade_checks": 15,
+  "retained_manager_assertions": 74,
+  "web_acceptance_cases": 24,
+  "web_button_cases": 16,
+  "java_target": 21,
+  "live_client_tested": false,
+  "gateway_rejection_fixed": false
+}

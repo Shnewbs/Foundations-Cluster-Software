@@ -1,0 +1,17 @@
+Foundations Cluster Runtime 0.0.5a
+
+SEAMLESS SESSION HANDOFF ALPHA
+- Velocity-backed persistent public Minecraft session transport
+- Foundations Velocity Gateway plugin 0.0.5a
+- Proxy Compatible Forge modern-forwarding bootstrap for NeoForge workers
+- Two-phase source/destination preparation with final source snapshot
+- Manual live handoff UI and console commands
+- Handoff rollback/timeout states
+- Stale source player-state updates fenced after session ownership moves
+- Preserved worker directories receive current cluster/proxy infrastructure when restarted
+
+NOT YET SHARED
+- Physical worker world saves remain independent
+- Region write fencing remains control-plane-only
+- Full inventory/XP/mod attachment handoff payload remains future work
+- Automatic region-boundary handoff is disabled by default pending live validation

@@ -1,0 +1,17 @@
+Foundations Cluster Runtime 0.0.3a
+==================================
+Population Layer Planner milestone.
+
+Major additions:
+- 16x16-chunk default population layer cells
+- real Layer IDs / states / population leases
+- session and party layer affinity
+- automatic split/merge groundwork with hysteresis
+- manual create/freeze/drain/retire controls
+- live layer/cell topology in Web UI
+- layer-aware placement contract
+- Node population-v1 assignment metadata
+- exact Node version detection for R7 -> 3a upgrades
+
+Safety boundary:
+Population layers DO NOT own persistent world state. Region Authority is 0.0.4a.

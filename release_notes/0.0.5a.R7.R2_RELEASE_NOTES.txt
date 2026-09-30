@@ -1,0 +1,12 @@
+Foundations Cluster Runtime 0.0.5a.R7.R2
+
+Region Transfer UI hardening revision.
+
+- Keeps the proven R7 authoritative chunk read-replication/data-plane implementation unchanged.
+- Replaces the inline Region Authority transfer dropdown with a stable modal.
+- Preserves the selected worker across the dashboard's live refresh cycle.
+- Rebuilds worker choices only when the eligible worker signature changes.
+- Filters unhealthy/offline/draining/maintenance/current-owner workers.
+- Shows worker MSPT, player count, state, and authority-region count.
+- Adds Auto Select Best Worker.
+- Keeps Cluster Node at 0.0.5a.R7; no Node rebuild is required.

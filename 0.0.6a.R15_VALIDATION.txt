@@ -1,0 +1,32 @@
+FOUNDATIONS CLUSTER 0.0.6a.R15 - VALIDATION CHECKLIST
+=======================================================
+
+LOCAL PACKAGE VALIDATION
+[x] Manager Java source compiles and built Manager JAR reports 0.0.6a.R15 / Node 0.0.6a.R7.
+[x] Cluster Node R7 source compiles against NeoForge 21.1.250/Minecraft 1.21.1 artifacts and required compile APIs.
+[x] Node JAR contains FoundationsClusterNode classes and metadata reports 0.0.6a.R7.
+[x] Gateway R15 source compiles against the Velocity API/runtime dependency bundle.
+[x] Gateway JAR metadata reports 0.0.6a.R15.
+[x] R15 Conduit replacement class preserves upstream class/method descriptors and delegates CONFIGURATION PluginMessagePacket handling to the active BackendConnectionPhase before the upstream brand fallback.
+[x] WebUI JavaScript passes node --check.
+[x] Desktop Python modules pass py_compile.
+[x] Manager build_manager.sh succeeds.
+[x] Portable updater ZIP integrity test succeeds.
+
+WINDOWS / LIVE VALIDATION REQUIRED
+[ ] Run updater from a fully stopped 0.0.6a.R14 cluster.
+[ ] Confirm isolated Java 25 gateway runtime is preserved/validated.
+[ ] Confirm Conduit marker is conduit-1.8.0-foundations-r15.
+[ ] Confirm exactly one Foundations Gateway R15 plugin is active.
+[ ] Confirm workers load Cluster Node R7.
+[ ] Safe Suite passes and transport heartbeat contains foundations-r15 + seamless + neoforge.
+[ ] Physical transfer commits with anchor + simulation both moved.
+[ ] Destination reaches login/join without the previous ~6-7 second read timeout.
+[ ] Client does not display Reconfiguring on a compatible same-dimension transfer.
+[ ] Graceful Stop keeps a source worker alive while an evacuation handoff is still active.
+[ ] Authority transitions do not produce sustained dataplane/persistence HTTP 409 spam.
+[ ] Replica synchronization does not repeatedly INFO-log identical changedBlocks=0 snapshots.
+[ ] Worker drawer slides closed when clicking outside it and when pressing Escape.
+
+NOTE
+The NeoForge seamless bridge cannot be fully proven without the user's real NeoForge/Proxy Compatible Forge client/backend negotiation. R15 should not be called seamless-complete until that live acceptance test passes.
