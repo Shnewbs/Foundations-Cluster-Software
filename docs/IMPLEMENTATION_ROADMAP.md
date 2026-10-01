@@ -1,5 +1,10 @@
 # Foundations Cluster Runtime Roadmap
 
+Current roadmap: [HF11 status and v2.2 spike/V0 gates](status/CURRENT_STATUS_AND_ROADMAP_2026-09-29.md).
+Current work: [v2.2 implementation evidence](status/WORLD_REPLICATION_V2_2_IMPLEMENTATION_2026-09-30.md).
+The milestone list below is historical and does not supersede the frozen v2.2
+design, accepted review addendum, or required Spike A/C and V0 gates.
+
 - **0.0.1a** — process orchestration / worker lifecycle.
 - **0.0.2a** — real Cluster Node telemetry, placement and all-in-one administration.
 - **0.0.3a** — Population Layer Planner, worker tooling, console and single-entry Gateway.

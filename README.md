@@ -1,11 +1,19 @@
 # Current source candidate: 0.0.6a.R19-HF11 / Node R13
 
-This source archive includes the compiled HF11 Manager and compiled Node R13.
+The HF11 release archive includes the compiled Manager and Node R13; this GitHub
+repository tracks source and excludes those packaged binaries.
 Gateway R19/Conduit are unchanged. For an existing installation, use the separate
 HF11 updater; do not overwrite your installed configuration or runtime folders.
 Personal worlds, journals, keys, worker instances and gateway state are excluded.
 See `docs/R19_HF11_NATURAL_GROWTH_VALIDATION.md` for the reproduced growth bug,
 executed tests, bounded simulation scope and installation instructions.
+
+World Replication v2.2 work starts with the frozen candidate design and accepted
+review addendum in `docs/frozen_design/`. The authoritative handoff roadmap is
+`docs/status/CURRENT_STATUS_AND_ROADMAP_2026-09-29.md`.
+See `docs/status/WORLD_REPLICATION_V2_2_IMPLEMENTATION_2026-09-30.md` for the first
+isolated Spike A/C protocol implementation, its tests, and outstanding runtime gates.
+HF11 remains the deployed runtime baseline; v2.2 is not a completed release.
 
 The earlier README below is retained for historical/background guidance; its
 version-specific statements do not supersede the HF11 validation report.
