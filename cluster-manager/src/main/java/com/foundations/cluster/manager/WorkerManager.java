@@ -289,36 +289,43 @@ final class WorkerManager implements AutoCloseable {
 
     void drain(String id, boolean value) {
         WorkerRecord w = require(id);
+        synchronized (w) {
         w.manualDrain(value);
-        if (value) w.state = w.players == 0 ? WorkerState.DRAINED : WorkerState.DRAINING;
-        else updateHealthyState(w);
+        updateHealthyState(w);
         log.info((value ? "Draining " : "Undraining ") + id + (w.drainBeforeStop!=null?" (preference saved; stop fence remains active)":""));
+        }
     }
 
     void drainForStop(String id) {
         WorkerRecord w=require(id);
+        synchronized (w) {
         w.fenceForStop();
         updateHealthyState(w);
         log.info("Evacuation drain enabled for "+id);
+        }
     }
 
     void releaseStopDrain(String id) {
         WorkerRecord w=require(id);
+        synchronized (w) {
         w.releaseStopFence();
         updateHealthyState(w);
         log.info("Evacuation drain released for "+id+"; operator drain="+w.draining);
+        }
     }
 
     void maintenance(String id, boolean value) {
         WorkerRecord w = require(id);
+        synchronized (w) {
         w.maintenance = value;
-        if (value) w.state = WorkerState.MAINTENANCE;
-        else updateHealthyState(w);
+        updateHealthyState(w);
         log.info((value ? "Maintenance enabled for " : "Maintenance disabled for ") + id);
+        }
     }
 
     void stop(String id) {
         WorkerRecord w = require(id);
+        synchronized (w) {
         if (w.state == WorkerState.OFFLINE || w.state == WorkerState.CRASHED) return;
         w.fenceForStop();
         w.ready = false;
@@ -351,6 +358,7 @@ final class WorkerManager implements AutoCloseable {
         } else {
             w.state = WorkerState.OFFLINE;
         }
+        }
     }
 
     void sendConsoleCommand(String id, String command) throws IOException {
@@ -376,6 +384,7 @@ final class WorkerManager implements AutoCloseable {
 
     void kill(String id) {
         WorkerRecord w = require(id);
+        synchronized (w) {
         if (!w.managed) throw new IllegalArgumentException(id + " is externally managed and cannot be killed by this manager.");
         Process p = w.process;
         w.fenceForStop();
@@ -394,6 +403,7 @@ final class WorkerManager implements AutoCloseable {
             return;
         }
         log.warn("Kill requested for " + id + " but no local/orphan process was alive");
+        }
     }
 
     boolean processAlive(String id) {
@@ -415,12 +425,14 @@ final class WorkerManager implements AutoCloseable {
 
     void markRetired(String id) {
         WorkerRecord w = require(id);
+        synchronized (w) {
         if (w.process != null && w.process.isAlive()) throw new IllegalStateException(id + " is still running");
         w.ready = false;
         w.draining = true;
         w.drainBeforeStop = null;
         w.state = WorkerState.RETIRED;
         log.info("Worker retired: " + id);
+        }
     }
 
     synchronized void delete(String id) throws IOException {
@@ -745,6 +757,7 @@ final class WorkerManager implements AutoCloseable {
         int port = Json.i(m, "port", 25565);
         boolean warm = Json.b(m, "warm", false);
         WorkerRecord w = workers.computeIfAbsent(id, k -> new WorkerRecord(k, port, false));
+        synchronized (w) {
         w.registeredAtMillis = System.currentTimeMillis();
         w.lastHeartbeatMillis = w.registeredAtMillis;
         w.warm = warm;
@@ -760,12 +773,14 @@ final class WorkerManager implements AutoCloseable {
         updateHealthyState(w);
         log.info("Agent registered: " + id + " port=" + port + " state=" + w.state + (w.managed ? (w.controlDetached ? " managed-detached" : " managed") : " external"));
         return w;
+        }
     }
 
     WorkerRecord heartbeat(Map<String,String> m) {
         String id = m.getOrDefault("workerId", "").trim();
         if (id.isBlank()) throw new IllegalArgumentException("workerId is required");
         WorkerRecord w = workers.computeIfAbsent(id, k -> new WorkerRecord(k, Json.i(m, "port", 25565), false));
+        synchronized (w) {
         w.lastHeartbeatMillis = System.currentTimeMillis();
         w.ready = Json.b(m, "ready", true);
         w.warm = Json.b(m, "warm", w.warm);
@@ -776,8 +791,9 @@ final class WorkerManager implements AutoCloseable {
             w.controlDetached = true;
             w.ready = false;
         }
-        if (w.state != WorkerState.STOPPING) updateHealthyState(w);
+        updateHealthyState(w);
         return w;
+        }
     }
 
     private void updateMetrics(WorkerRecord w, Map<String,String> m) {
@@ -815,6 +831,10 @@ final class WorkerManager implements AutoCloseable {
     }
 
     private void updateHealthyState(WorkerRecord w) {
+        if (w.state == WorkerState.STOPPING || w.state == WorkerState.KILLED || w.state == WorkerState.RETIRED) {
+            w.ready = false;
+            return;
+        }
         if (w.managed && w.controlDetached) {
             w.ready = false;
             w.state = WorkerState.UNHEALTHY;

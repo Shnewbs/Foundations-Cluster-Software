@@ -138,6 +138,12 @@ public final class HardeningSelfTest {
             }
             for(int i=0;i<100;i++){relay.publish(generic);relay.pollBundle(target.id,1);}
             check(relay.summary().inflight()<=32&&relay.summary().pending()<=32,"Relay backlog exceeded bounds");
+            workers.stop(owner.id);
+            workers.heartbeat(Map.of("workerId",owner.id,"ready","true"));
+            check(!owner.ready && owner.state==WorkerState.STOPPING,"Late heartbeat revived stopped worker");
+            workers.drain(owner.id,true);workers.maintenance(owner.id,true);
+            workers.register(Map.of("workerId",owner.id,"ready","true"));
+            check(!owner.ready && owner.state==WorkerState.STOPPING,"Late registration or policy edit removed stop fence");
         }
     }
     static final class Exchange extends HttpExchange {
