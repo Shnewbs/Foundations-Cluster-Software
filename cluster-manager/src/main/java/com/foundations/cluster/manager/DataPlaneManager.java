@@ -21,6 +21,7 @@ final class DataPlaneManager implements AutoCloseable {
     private final ClusterLog log;
     private final PersistentBlockJournal persistence;
     private final PersistentBlockEntityJournal blockEntityPersistence;
+    private final String incarnation=UUID.randomUUID().toString();
     private final AtomicLong sequence=new AtomicLong();
     private final ConcurrentHashMap<String,ConcurrentLinkedDeque<DataPlaneFrame>> pending=new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String,ConcurrentHashMap<String,DataPlaneFrame>> inflight=new ConcurrentHashMap<>();
@@ -285,7 +286,7 @@ final class DataPlaneManager implements AutoCloseable {
 
     private void markDelivery(DataPlaneFrame f,long now){f.lastDeliveryAtMillis=now;f.deliveries++;delivered.incrementAndGet();}
     private void recordRecent(DataPlaneFrame f){recent.addLast(f);while(recent.size()>500)recent.pollFirst();}
-    private String id(){return String.format(Locale.ROOT,"dp-%010d",sequence.incrementAndGet());}
+    private String id(){return String.format(Locale.ROOT,"dp-%s-%010d",incarnation,sequence.incrementAndGet());}
     private IllegalArgumentException reject(String s){rejected.incrementAndGet();return new IllegalArgumentException(s);}
     private static String req(Map<String,String>m,String k){String v=m.getOrDefault(k,"").trim();if(v.isBlank())throw new IllegalArgumentException(k+" is required");return v;}
     private static String enc(String s){return Base64.getUrlEncoder().withoutPadding().encodeToString((s==null?"":s).getBytes(StandardCharsets.UTF_8));}

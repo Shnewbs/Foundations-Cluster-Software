@@ -122,7 +122,7 @@ public final class HardeningSelfTest {
             var r=regions.ensure(new RegionKey("foundations","minecraft:overworld",0,0),owner.id,"fixture");
             var s=sessions.place(new HashMap<>(Map.of("playerId","fixture-player","cellX","0","cellZ","0"))).session();s.anchorWorkerId=target.id;
             var frame=new HashMap<>(Map.of("kind","PERSIST_BLOCK","sourceWorkerId",owner.id,"regionId",r.key.id(),"authorityEpoch",Long.toString(r.epoch),"payload","1|64|1|"+Base64.getUrlEncoder().encodeToString("minecraft:stone".getBytes())));
-            relay.publish(frame);relay.publish(frame);
+            var first=relay.publish(frame);relay.publish(frame);
             check(relay.summary().pending()==1,"Pending invalidations did not coalesce");
             check(!relay.pollBundle(target.id,1).isEmpty(),"Invalidation not delivered");
             relay.publish(frame);check(relay.summary().pending()==1,"Post-delivery write lost its invalidation");
@@ -130,6 +130,12 @@ public final class HardeningSelfTest {
             frame.put("authorityEpoch",Long.toString(r.epoch+1));rejects(IllegalArgumentException.class,()->relay.publish(frame));
             frame.put("authorityEpoch",Long.toString(r.epoch));r.leaseExpiresAtMillis=0;rejects(IllegalArgumentException.class,()->relay.publish(frame));
             var generic=new HashMap<>(Map.of("kind","ENTITY_DELTA","sourceWorkerId",owner.id,"targetWorkerId",target.id));
+            try(var restarted=new DataPlaneManager(config(root.resolve("new-process")),workers,sessions,regions,log)) {
+                var current=restarted.publish(generic);restarted.pollBundle(target.id,1);
+                check(!current.id.equals(first.id),"Frame identity reused across manager processes");
+                restarted.ack(target.id,first.id,true,"");
+                check(restarted.summary().inflight()==1,"Delayed old acknowledgement discarded a new frame");
+            }
             for(int i=0;i<100;i++){relay.publish(generic);relay.pollBundle(target.id,1);}
             check(relay.summary().inflight()<=32&&relay.summary().pending()<=32,"Relay backlog exceeded bounds");
         }

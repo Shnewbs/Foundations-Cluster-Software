@@ -33,6 +33,7 @@ unchanged. No provided live installation was modified.
 | Recovery | Corrupt/truncated rows silently skipped | Stream journals, validate records, refuse startup with file/line; validate authority metadata instead of silently resetting it |
 | Authority mutation | Ownership could change between validation and WAL append | Serialize durable commit validation and append with authority transitions; reject expired leases |
 | Replicas | Sliding throttle could suppress invalidations indefinitely | Coalesce pending notices only; release coalescing key on dequeue/eviction/expiry |
+| Relay restart | Counter-only IDs repeated after restart; old acknowledgement could remove new frame | Add a random process identity to every frame ID |
 | Relay | Concurrent enqueue could exceed queue bound; inflight unbounded by count | Serialize per-worker queue operations and cap in-flight frames |
 | v2.2 model | Valid checksum did not enforce replay transitions | Check sequence, initial stage, reservations and immutable result transitions |
 | Builds/tests | New suites missing from older runners; Windows paths previously escaped | One portable entry point, complete model/manager/helper/UI suites, Windows/Linux CI in a path with spaces |
@@ -51,7 +52,7 @@ two dependency-free Node helpers, simulator compilation, six UI handler suites,
 and four real local Manager HTTP suites. Node deployment tests explicitly use
 metadata fixtures; they do not compile or simulate Minecraft. The v2.2 model suite
 now has 102 checks, including checksum-valid but semantically invalid replay.
-Security/recovery/queue hardening adds 59 direct checks and 13 HTTP checks.
+Security/recovery/queue hardening adds 61 direct checks and 13 HTTP checks.
 
 `tests/updater_test.ps1` exercises install, rollback, tampered hashes, forbidden and
 traversal paths, lock refusal, interrupted-update handling and failed replacement

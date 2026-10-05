@@ -60,6 +60,7 @@ public final class NodeStartupSelfTest {
    Files.delete(mods.resolve(current));Files.delete(cache.resolve(current));
    Files.writeString(home.resolve("minecraft-agent/build_mod.sh"),"#!/bin/sh\nprintf '%s' \"$*\" > build-args.txt\nexit 0\n");
    Files.writeString(home.resolve("minecraft-agent/build_mod.bat"),"@echo off\r\ntype nul > build-args.txt\r\nif not \"%*\"==\"\" echo %* > build-args.txt\r\nexit /b 0\r\n");
+   Files.createDirectories(home.resolve("tools"));Files.writeString(home.resolve("tools/ensure_gradle.ps1"),"# prerequisite fixture; build script does not invoke Gradle\n");
    for(int n=0;n<3;n++){node.buildAndInstallAsync();waitFor(node);}
    check(!node.mayAutoRetry()&&node.statusJson().contains("\"automaticBuildPaused\":true"),"three failed outputs pause automatic rebuilds");
    check(node.statusJson().contains("Expected Cluster Node 0.0.6a.R13")&&node.statusJson().contains(old),"diagnostic includes expected/found files");
