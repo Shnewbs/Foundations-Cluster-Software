@@ -49,18 +49,23 @@ final class AuthManager {
         if (!setupRequired()) throw new IllegalStateException("Administrator account is already configured.");
         if (!isLoopback(e)) throw new SecurityException("First-run administrator setup is only allowed from the local machine.");
         validateUsername(username); validatePassword(password);
-        credential = new Credential(username, hashPassword(password));
-        saveCredential();
+        Credential next = new Credential(username, hashPassword(password));
+        saveCredential(next);
+        credential = next;
         log.info("Security: administrator account created for "+username);
         return issue(username,remember);
     }
 
     synchronized LoginResult login(String username, String password, boolean remember, String remoteKey) throws Exception {
         if (setupRequired()) throw new IllegalStateException("Administrator setup is required.");
-        Attempt a=attempts.computeIfAbsent(remoteKey,k->new Attempt());
         long now=System.currentTimeMillis();
+        attempts.entrySet().removeIf(entry -> now - entry.getValue().lastSeen > 600_000 && entry.getValue().lockedUntil < now);
+        if (!attempts.containsKey(remoteKey) && attempts.size() >= 4096)
+            throw new SecurityException("Sign-in capacity reached; retry shortly.");
+        Attempt a=attempts.computeIfAbsent(remoteKey,k->new Attempt());
+        a.lastSeen = now;
         if(a.lockedUntil>now) throw new SecurityException("Too many failed sign-in attempts. Try again in "+Math.max(1,(a.lockedUntil-now)/1000)+" seconds.");
-        if (!credential.username.equals(username) || !verifyPassword(password,credential.hash)) {
+        if (password == null || password.length() > 256 || !credential.username.equals(username) || !verifyPassword(password,credential.hash)) {
             a.failures++;
             if(a.failures>=5){a.failures=0;a.lockedUntil=now+60_000;}
             throw new SecurityException("Invalid username or password.");
@@ -72,8 +77,8 @@ final class AuthManager {
     synchronized void logout(HttpExchange e) throws IOException {
         String token=cookieToken(e);
         if(token==null)return;
-        sessions.remove(tokenHash(token));
-        saveSessions();
+        String hash = tokenHash(token); Session old = sessions.remove(hash);
+        try { saveSessions(); } catch (IOException ex) { if (old != null) sessions.put(hash,old); throw ex; }
     }
 
     synchronized void changePassword(String current, String next, HttpExchange e) throws Exception {
@@ -81,13 +86,17 @@ final class AuthManager {
         if(user==null)throw new SecurityException("Authentication required.");
         if(!verifyPassword(current,credential.hash))throw new SecurityException("Current password is incorrect.");
         validatePassword(next);
-        credential=new Credential(credential.username,hashPassword(next));
-        saveCredential();
+        Credential replacement=new Credential(credential.username,hashPassword(next));
+        saveCredential(replacement);
+        credential=replacement;
         sessions.clear(); saveSessions();
         log.info("Security: administrator password changed; all remembered sessions revoked");
     }
 
-    synchronized void revokeAllSessions(){sessions.clear();try{saveSessions();}catch(IOException ignored){}}
+    synchronized void revokeAllSessions() throws IOException {
+        var old = new LinkedHashMap<>(sessions); sessions.clear();
+        try { saveSessions(); } catch (IOException ex) { sessions.putAll(old); throw ex; }
+    }
 
     synchronized String authenticatedUser(HttpExchange e){
         String token=cookieToken(e); if(token==null)return null;
@@ -107,7 +116,7 @@ final class AuthManager {
         long seconds=remember?Math.max(1,cfg.getLong("security.rememberDays",30))*86400L:Math.max(1,cfg.getLong("security.sessionHours",12))*3600L;
         long expires=now+seconds*1000L;
         sessions.put(tokenHash(token),new Session(username,now,expires,now));
-        prune();saveSessions();
+        prune();try { saveSessions(); } catch (IOException ex) { sessions.remove(tokenHash(token)); throw ex; }
         return new LoginResult(username,token,seconds,expires,remember);
     }
 
@@ -121,28 +130,35 @@ final class AuthManager {
     }
 
     private void loadCredential() throws IOException {
-        if(!Files.isRegularFile(adminFile)){credential=null;return;}
-        Map<String,String> m=Json.flatObject(Files.readString(adminFile,StandardCharsets.UTF_8));
+        if(!Files.exists(adminFile, LinkOption.NOFOLLOW_LINKS)){credential=null;return;}
+        if(!Files.isRegularFile(adminFile, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Administrator credential file is not a regular file");
+        Map<String,String> m;
+        try { m=Json.flatObject(Files.readString(adminFile,StandardCharsets.UTF_8)); }
+        catch (RuntimeException ex) { throw new IOException("Invalid administrator credentials; restore the security backup", ex); }
         String u=m.get("username"),h=m.get("passwordHash");
-        if(u==null||h==null||u.isBlank()||h.isBlank()){credential=null;return;}
+        if(u==null||!u.matches("[A-Za-z0-9._-]{3,32}")||!validHash(h))
+            throw new IOException("Invalid administrator credentials; restore the security backup. Setup was not reopened.");
         credential=new Credential(u,h);
     }
-    private void saveCredential() throws IOException {
-        String json="{\n  \"username\": "+Json.q(credential.username)+",\n  \"passwordHash\": "+Json.q(credential.hash)+",\n  \"updatedAt\": "+Json.q(Instant.now().toString())+"\n}\n";
+    private void saveCredential(Credential next) throws IOException {
+        String json="{\n  \"username\": "+Json.q(next.username)+",\n  \"passwordHash\": "+Json.q(next.hash)+",\n  \"updatedAt\": "+Json.q(Instant.now().toString())+"\n}\n";
         writeAtomic(adminFile,json);
     }
 
     private void loadSessions() throws IOException {
-        sessions.clear(); if(!Files.isRegularFile(sessionsFile))return;
+        sessions.clear(); if(credential == null || !Files.isRegularFile(sessionsFile))return;
         for(String line:Files.readAllLines(sessionsFile,StandardCharsets.UTF_8)){
-            Map<String,String>m=Json.flatObject(line);String h=m.get("hash"),u=m.get("username");
+            Map<String,String>m;
+            try { m=Json.flatObject(line); } catch (IllegalArgumentException ex) { log.warn("Ignored malformed remembered session"); continue; }
+            String h=m.get("hash"),u=m.get("username");
+            if(!credential.username.equals(u) || !tokenHash(credential.hash).equals(m.get("credentialId"))) continue;
             try{long c=Long.parseLong(m.getOrDefault("createdAt","0")),x=Long.parseLong(m.getOrDefault("expiresAt","0")),ls=Long.parseLong(m.getOrDefault("lastSeen",Long.toString(c)));if(h!=null&&u!=null&&x>System.currentTimeMillis())sessions.put(h,new Session(u,c,x,ls));}catch(Exception ignored){}
         }
         prune();
     }
     private void saveSessions() throws IOException {
         prune();StringBuilder b=new StringBuilder();
-        for(var e:sessions.entrySet()){Session s=e.getValue();b.append("{\"hash\":").append(Json.q(e.getKey())).append(",\"username\":").append(Json.q(s.username)).append(",\"createdAt\":").append(s.createdAt).append(",\"expiresAt\":").append(s.expiresAt).append(",\"lastSeen\":").append(s.lastSeen).append("}\n");}
+        for(var e:sessions.entrySet()){Session s=e.getValue();b.append("{\"hash\":").append(Json.q(e.getKey())).append(",\"username\":").append(Json.q(s.username)).append(",\"credentialId\":").append(Json.q(tokenHash(credential.hash))).append(",\"createdAt\":").append(s.createdAt).append(",\"expiresAt\":").append(s.expiresAt).append(",\"lastSeen\":").append(s.lastSeen).append("}\n");}
         writeAtomic(sessionsFile,b.toString());
     }
     private void prune(){long now=System.currentTimeMillis();sessions.entrySet().removeIf(e->e.getValue().expiresAt<now);}
@@ -153,7 +169,8 @@ final class AuthManager {
     }
     private static boolean verifyPassword(String password,String encoded){
         try{
-            String[] p=encoded.split("\\$");if(p.length<6||!p[1].equals("argon2id"))return false;
+            if(password == null || password.length() > 256 || !validHash(encoded)) return false;
+            String[] p=encoded.split("\\$");
             String[] params=p[3].split(",");int m=Integer.parseInt(params[0].substring(2)),t=Integer.parseInt(params[1].substring(2)),par=Integer.parseInt(params[2].substring(2));
             byte[] salt=Base64.getDecoder().decode(p[4]), expected=Base64.getDecoder().decode(p[5]);
             return MessageDigest.isEqual(expected,argon(password,salt,m,t,par));
@@ -167,12 +184,26 @@ final class AuthManager {
     private static String tokenHash(String token){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
     private static void validateUsername(String u){if(u==null||!u.matches("[A-Za-z0-9._-]{3,32}"))throw new IllegalArgumentException("Username must be 3-32 characters using letters, numbers, dot, underscore, or dash.");}
     private static void validatePassword(String p){if(p==null||p.length()<10)throw new IllegalArgumentException("Password must be at least 10 characters.");if(p.length()>256)throw new IllegalArgumentException("Password is too long.");}
-    private static void writeAtomic(Path p,String s)throws IOException{Files.createDirectories(p.getParent());Path t=p.resolveSibling(p.getFileName()+".tmp");Files.writeString(t,s,StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING);try{Files.move(t,p,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}catch(AtomicMoveNotSupportedException e){Files.move(t,p,StandardCopyOption.REPLACE_EXISTING);}}
+    private static void writeAtomic(Path p,String s)throws IOException {
+        DurableFiles.replace(p,s.getBytes(StandardCharsets.UTF_8));
+    }
+    private static boolean validHash(String encoded) {
+        try {
+            if (encoded == null || encoded.length() > 512) return false;
+            String[] p=encoded.split("\\$", -1);
+            if(p.length!=6 || !p[0].isEmpty() || !p[1].equals("argon2id") || !p[2].equals("v=19")) return false;
+            if (!p[3].matches("m=[0-9]+,t=[0-9]+,p=[0-9]+")) return false;
+            String[] a=p[3].split(","); int m=Integer.parseInt(a[0].substring(2)),t=Integer.parseInt(a[1].substring(2)),par=Integer.parseInt(a[2].substring(2));
+            return m >= 8 && m <= 262144 && t >= 1 && t <= 10 && par >= 1 && par <= 16 && m >= 8 * par
+                && Base64.getDecoder().decode(p[4]).length == 16 && Base64.getDecoder().decode(p[5]).length == 32;
+        } catch (RuntimeException ex) { return false; }
+    }
+
     private static boolean isLoopback(HttpExchange e){try{InetAddress a=e.getRemoteAddress().getAddress();return a!=null&&a.isLoopbackAddress();}catch(Exception x){return false;}}
     private static boolean isWindows(){return System.getProperty("os.name","").toLowerCase(Locale.ROOT).contains("win");}
 
     record LoginResult(String username,String token,long maxAgeSeconds,long expiresAt,boolean persistent){}
     private record Credential(String username,String hash){}
     private static final class Session{final String username;final long createdAt;final long expiresAt;volatile long lastSeen;Session(String username,long createdAt,long expiresAt,long lastSeen){this.username=username;this.createdAt=createdAt;this.expiresAt=expiresAt;this.lastSeen=lastSeen;}}
-    private static final class Attempt{int failures;long lockedUntil;}
+    private static final class Attempt{int failures;long lockedUntil;long lastSeen;}
 }

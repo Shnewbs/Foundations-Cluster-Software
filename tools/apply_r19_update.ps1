@@ -1,5 +1,6 @@
 param([string]$ClusterRoot,[string]$Rollback)
 $ErrorActionPreference='Stop'
+throw 'This legacy HF9 installer is retired. Download the updater from GitHub Releases and use its APPLY_UPDATE.bat. Do not run a historical installer from the source checkout.'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 function Choose-Root {
   try {Add-Type -AssemblyName System.Windows.Forms;$picker=New-Object System.Windows.Forms.FolderBrowserDialog;$picker.Description='Select your stopped Foundations Cluster folder';if($picker.ShowDialog() -eq 'OK'){$picked=$picker.SelectedPath};$picker.Dispose();if($picked){return $picked}}catch{}

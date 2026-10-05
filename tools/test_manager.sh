@@ -15,3 +15,5 @@ java -cp "$root/cluster-manager/build/test-classes:$root/cluster-manager/build/F
 java -cp "$root/cluster-manager/build/test-classes:$root/cluster-manager/build/FoundationsClusterManager.jar:$root/cluster-manager/lib/bcprov.jar" com.foundations.cluster.manager.R19HydrationSelfTest
 java -cp "$root/cluster-manager/build/test-classes:$root/cluster-manager/build/FoundationsClusterManager.jar:$root/cluster-manager/lib/bcprov.jar" com.foundations.cluster.manager.SupportArchivesSelfTest
 java -cp "$root/cluster-manager/build/test-classes:$root/cluster-manager/build/FoundationsClusterManager.jar:$root/cluster-manager/lib/bcprov.jar" com.foundations.cluster.manager.RestartAvailabilitySelfTest
+java -cp "$root/cluster-manager/build/test-classes:$root/cluster-manager/build/FoundationsClusterManager.jar:$root/cluster-manager/lib/bcprov.jar" com.foundations.cluster.manager.NodeStartupSelfTest "$root"
+java -cp "$root/cluster-manager/build/test-classes:$root/cluster-manager/build/FoundationsClusterManager.jar:$root/cluster-manager/lib/bcprov.jar" com.foundations.cluster.manager.HardeningSelfTest

@@ -1,22 +1,34 @@
-# Current source candidate: 0.0.6a.R19-HF11 / Node R13
+# Foundations Cluster — 0.0.6a.R19-HF12 / Node R13
 
-The HF11 release archive includes the compiled Manager and Node R13; this GitHub
-repository tracks source and excludes those packaged binaries.
-Gateway R19/Conduit are unchanged. For an existing installation, use the separate
-HF11 updater; do not overwrite your installed configuration or runtime folders.
-Personal worlds, journals, keys, worker instances and gateway state are excluded.
-See `docs/R19_HF11_NATURAL_GROWTH_VALIDATION.md` for the reproduced growth bug,
-executed tests, bounded simulation scope and installation instructions.
+HF12 hardens administrator security, journal recovery, replica invalidation and
+updater safety. It is a **pre-release control-plane hotfix** for an existing HF11
+installation. Node R13 and Gateway R19/Conduit are unchanged.
 
-World Replication v2.2 work starts with the frozen candidate design and accepted
-review addendum in `docs/frozen_design/`. The authoritative handoff roadmap is
-`docs/status/CURRENT_STATUS_AND_ROADMAP_2026-09-29.md`.
-See `docs/status/WORLD_REPLICATION_V2_2_IMPLEMENTATION_2026-09-30.md` for the first
-isolated Spike A/C protocol implementation, its tests, and outstanding runtime gates.
-HF11 remains the deployed runtime baseline; v2.2 is not a completed release.
+- **Install updates:** download the `FoundationsCluster-…-UPDATER.zip` asset from
+  [GitHub Releases](https://github.com/Shnewbs/Foundations-Cluster-Software/releases).
+  Extract it separately, stop the cluster, and run `APPLY_UPDATE.bat`. Worlds,
+  credentials and active configuration are preserved. Older remembered sessions
+  are revoked once. Keep the printed backup path for rollback.
+- **Develop:** source remains on `main`. Run `python tools/validate.py` with a full
+  JDK 21, Python 3.12 and Node 22. The Windows launcher initializes active config
+  from `config/cluster.properties.default`; direct Java launches require that copy.
+  Application binaries belong in release assets, not source commits.
+- **Release:** CI validates Linux and Windows (including paths with spaces) before
+  publishing a new, uniquely versioned pre-release updater. Existing release assets
+  are never replaced by a later source push with the same version.
 
-The earlier README below is retained for historical/background guidance; its
-version-specific statements do not supersede the HF11 validation report.
+Read [HF12 changes and compatibility](release_notes/0.0.6a.R19-HF12.md) and the
+[audit and remaining production gates](docs/audits/2026-10-05-hardening.md).
+The HF11 validation record remains in `docs/R19_HF11_NATURAL_GROWTH_VALIDATION.md`.
+The historical HF9 installer is retired; do not run it against current installs.
+
+World Replication v2.2 remains an isolated protocol model. Its frozen design and
+accepted addendum are in `docs/frozen_design/`, and its source handoff roadmap is
+`docs/status/CURRENT_STATUS_AND_ROADMAP_2026-09-29.md`. No live v2.2 Minecraft
+integration or production readiness is implied by passing model tests.
+
+The README below is historical context; its installation/version claims are
+superseded by the current instructions and audit above.
 
 ---
 

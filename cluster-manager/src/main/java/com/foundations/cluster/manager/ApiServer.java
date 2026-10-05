@@ -55,12 +55,12 @@ final class ApiServer implements AutoCloseable {
 
     private void authStatus(HttpExchange e)throws IOException{json(e,200,auth.statusJson(e));}
     private void authSetup(HttpExchange e)throws IOException{
-        if(!post(e))return;Map<String,String>m=Json.flatObject(body(e));
+        if(!post(e))return;Map<String,String>m=Json.flatObject(body(e,8192));
         try{var r=auth.setup(m.get("username"),m.get("password"),Json.b(m,"remember",true),e);e.getResponseHeaders().add("Set-Cookie",auth.cookieHeader(r));audit.record(r.username(),"AUTH_SETUP","admin","First-run administrator configured");json(e,201,"{\"ok\":true,\"username\":"+Json.q(r.username())+"}");}
         catch(SecurityException ex){json(e,403,"{\"error\":"+Json.q(ex.getMessage())+"}");}catch(Exception ex){json(e,400,"{\"error\":"+Json.q(ex.getMessage())+"}");}
     }
     private void authLogin(HttpExchange e)throws IOException{
-        if(!post(e))return;Map<String,String>m=Json.flatObject(body(e));String remote=String.valueOf(e.getRemoteAddress());
+        if(!post(e))return;Map<String,String>m=Json.flatObject(body(e,8192));String remote=e.getRemoteAddress().getAddress().getHostAddress();
         try{var r=auth.login(m.getOrDefault("username",""),m.getOrDefault("password",""),Json.b(m,"remember",false),remote);e.getResponseHeaders().add("Set-Cookie",auth.cookieHeader(r));audit.record(r.username(),"LOGIN","dashboard",remote);json(e,200,"{\"ok\":true,\"username\":"+Json.q(r.username())+",\"expiresAt\":"+r.expiresAt()+"}");}
         catch(SecurityException ex){audit.record(m.getOrDefault("username","?"),"LOGIN_FAILED","dashboard",remote);json(e,401,"{\"error\":"+Json.q(ex.getMessage())+"}");}catch(Exception ex){json(e,400,"{\"error\":"+Json.q(ex.getMessage())+"}");}
     }
@@ -450,7 +450,8 @@ final class ApiServer implements AutoCloseable {
 
     private void staticFile(HttpExchange e)throws IOException{String path=e.getRequestURI().getPath();if(path.equals("/"))path="/index.html";if(path.contains("..")){text(e,400,"bad path","text/plain");return;}Path base=cfg.home().resolve("web").normalize(),file=base.resolve(path.substring(1)).normalize();if(!file.startsWith(base)||!Files.isRegularFile(file)){text(e,404,"not found","text/plain");return;}String ct=path.endsWith(".html")?"text/html; charset=utf-8":path.endsWith(".js")?"application/javascript; charset=utf-8":path.endsWith(".css")?"text/css; charset=utf-8":path.endsWith(".svg")?"image/svg+xml":path.endsWith(".json")?"application/json; charset=utf-8":"application/octet-stream";byte[]data=Files.readAllBytes(file);securityHeaders(e);e.getResponseHeaders().set("Content-Type",ct);e.getResponseHeaders().set("Cache-Control","no-store");e.sendResponseHeaders(200,data.length);try(OutputStream out=e.getResponseBody()){out.write(data);}}
     private static boolean post(HttpExchange e)throws IOException{if(e.getRequestMethod().equals("POST"))return true;json(e,405,"{\"error\":\"POST required\"}");return false;}
-    private static String body(HttpExchange e)throws IOException{byte[] data=e.getRequestBody().readNBytes(32*1024*1024+1);if(data.length>32*1024*1024)throw new IOException("Request too large");return new String(data,StandardCharsets.UTF_8);}
+    private static String body(HttpExchange e)throws IOException{return body(e,32*1024*1024);}
+    private static String body(HttpExchange e,int limit)throws IOException{byte[] data=e.getRequestBody().readNBytes(limit+1);if(data.length>limit)throw new IOException("Request too large");return new String(data,StandardCharsets.UTF_8);}
     private static Map<String,String> query(HttpExchange e){Map<String,String>m=new HashMap<>();String q=e.getRequestURI().getRawQuery();if(q==null)return m;for(String p:q.split("&")){String[]kv=p.split("=",2);m.put(URLDecoder.decode(kv[0],StandardCharsets.UTF_8),kv.length>1?URLDecoder.decode(kv[1],StandardCharsets.UTF_8):"");}return m;}
     private static int intQuery(HttpExchange e,String key,int d,int min,int max){try{return Math.max(min,Math.min(max,Integer.parseInt(query(e).getOrDefault(key,Integer.toString(d)))));}catch(Exception x){return d;}}
     private static String stringArray(Collection<String> s){StringBuilder b=new StringBuilder("[");boolean first=true;for(String x:s){if(!first)b.append(',');first=false;b.append(Json.q(x));}return b.append(']').toString();}

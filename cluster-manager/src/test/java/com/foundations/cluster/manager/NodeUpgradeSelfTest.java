@@ -14,10 +14,15 @@ public final class NodeUpgradeSelfTest {
   Path source=Path.of(args[0]);Properties properties=new Properties();
   try(var in=Files.newInputStream(source.resolve("minecraft-agent/gradle.properties"))){properties.load(in);}
   String expected=properties.getProperty("mod_version");String current="foundations_cluster_node-"+expected+".jar",old="foundations_cluster_node-0.0.6a.R8.jar";
-  byte[] currentBytes=Files.readAllBytes(source.resolve("minecraft-agent/build/libs/"+current));
+  byte[] currentBytes;
+  if(args.length>1 && args[1].equals("--fixture")) {
+   Path fixture=Files.createTempFile("foundations-node-metadata-", ".jar");
+   try {NodeStartupSelfTest.jar(fixture,expected);currentBytes=Files.readAllBytes(fixture);}finally{Files.delete(fixture);}
+   System.out.println("NodeUpgradeSelfTest: metadata fixture mode (not a game binary validation)");
+  } else currentBytes=Files.readAllBytes(source.resolve("minecraft-agent/build/libs/"+current));
   try(var jar=new JarInputStream(new ByteArrayInputStream(currentBytes))){
    String metadata="";for(JarEntry e;(e=jar.getNextJarEntry())!=null;)if(e.getName().equals("META-INF/neoforge.mods.toml"))metadata=new String(jar.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
-   check(metadata.contains("version=\""+expected+"\""),"Packaged Node metadata disagrees with build version");
+   check(metadata.replace(" ","").contains("version=\""+expected+"\""),"Packaged Node metadata disagrees with build version");
   }
   Path home=Files.createTempDirectory("foundations-node-upgrade-");
   try{

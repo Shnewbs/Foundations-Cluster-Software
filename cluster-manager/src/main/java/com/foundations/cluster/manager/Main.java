@@ -23,6 +23,8 @@ public final class Main {
     private static void run() throws Exception {
         ManagerConfig cfg=ManagerConfig.load();
         try (ManagerLock lock=ManagerLock.acquire(cfg.home().resolve("runtime"))) {
+            if(Files.exists(cfg.home().resolve("runtime/update-in-progress.json")))
+                throw new IllegalStateException("An update was interrupted. Restore the recorded update backup before starting the cluster.");
             ClusterLog log=new ClusterLog(cfg.home().resolve("logs/cluster-manager.log"),cfg.getInt("logs.maxDashboardLines",300));
             log.info("Foundations Cluster Runtime "+ClusterVersion.VERSION+" starting (package "+ClusterVersion.PACKAGE_REVISION+")");
             log.info("Startup: initializing audit and encrypted security state");

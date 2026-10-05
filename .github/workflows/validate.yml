@@ -1,0 +1,87 @@
+name: Validate and package
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: source with spaces
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: source with spaces
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Compile and run Java, UI and HTTP regressions
+        run: python tools/validate.py
+      - name: Exercise Windows launch build scripts
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          & tools/build_manager.ps1
+          & tools/build_simulator.ps1
+          & tools/build_reference.ps1
+      - name: Build updater from tested source
+        if: runner.os == 'Windows'
+        run: python tools/package_updater.py
+      - name: Validate updater transactions
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          & tests/updater_test.ps1 -Archive (Get-ChildItem dist/*-UPDATER.zip).FullName
+      - name: Save tested updater
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-updater
+          path: source with spaces/dist/*
+          if-no-files-found: error
+          retention-days: 14
+  release:
+    needs: regression
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-updater
+          path: dist
+      - name: Publish new version once, after both platforms pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python -c 'import re,pathlib;print(re.search(r"PACKAGE_REVISION = \"([^\"]+)\"",pathlib.Path("cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java").read_text()).group(1))')
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "Release v$version already exists; immutable assets left unchanged."
+          else
+            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — control-plane hardening" --notes-file "release_notes/$version.md"
+          fi

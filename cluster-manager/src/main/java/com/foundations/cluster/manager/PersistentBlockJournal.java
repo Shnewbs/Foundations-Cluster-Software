@@ -35,6 +35,8 @@ final class PersistentBlockJournal implements AutoCloseable {
     private final ConcurrentHashMap<BlockKey, Entry> latest = new ConcurrentHashMap<>();
     private final AtomicLong revision = new AtomicLong();
     private long walEntries;
+    private long nextCompaction = 4096;
+    private boolean writeFailed;
 
     PersistentBlockJournal(ManagerConfig cfg, ClusterLog log) throws IOException {
         this.enabled = cfg.getBoolean("persistence.blockJournalEnabled", true);
@@ -54,6 +56,7 @@ final class PersistentBlockJournal implements AutoCloseable {
                               int x, int y, int z, String blockState) {
         if (!enabled) return new Entry(new BlockKey(worldId, dimensionId, x, y, z), regionId, authorityEpoch, blockState, revision.get(), System.currentTimeMillis());
         if (regionId == null || regionId.isBlank()) throw new IllegalArgumentException("regionId is required for persistent block journal");
+        if (writeFailed) throw new IllegalStateException("Journal write failed; restart and reconcile before accepting more mutations");
         long rev = revision.incrementAndGet();
         Entry entry = new Entry(
                 new BlockKey(blank(worldId, "foundations"), blank(dimensionId, "minecraft:overworld"), x, y, z),
@@ -65,7 +68,7 @@ final class PersistentBlockJournal implements AutoCloseable {
         appendWal(entry);
         latest.put(entry.key(), entry);
         walEntries++;
-        if (walEntries >= 4096) compactSafe();
+        if (walEntries >= nextCompaction) compactSafe();
         return entry;
     }
 
@@ -89,7 +92,7 @@ final class PersistentBlockJournal implements AutoCloseable {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.toString().getBytes(StandardCharsets.UTF_8));
     }
 
-    Summary summary() { return new Summary(enabled, revision.get(), latest.size(), walEntries); }
+    synchronized Summary summary() { return new Summary(enabled, revision.get(), latest.size(), walEntries); }
 
     synchronized byte[] diagnosticSnapshot(int maxBytes) {
         var out=new java.io.ByteArrayOutputStream();
@@ -106,31 +109,40 @@ final class PersistentBlockJournal implements AutoCloseable {
             Files.createDirectories(walFile.getParent());
             byte[] bytes = line(e).getBytes(StandardCharsets.UTF_8);
             try (FileChannel ch = FileChannel.open(walFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
-                ch.write(ByteBuffer.wrap(bytes));
+                DurableFiles.writeFully(ch, ByteBuffer.wrap(bytes));
                 ch.force(true);
             }
         } catch (IOException ex) {
-            revision.decrementAndGet();
+            writeFailed = true; // The append outcome may be uncertain; never reuse the revision.
             throw new IllegalStateException("could not durably append persistent block journal: " + ex.getMessage(), ex);
         }
     }
 
     private void loadFile(Path file) throws IOException {
-        if (!Files.isRegularFile(file)) return;
-        for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+        DurableFiles.validateJournal(file);
+        if (!Files.exists(file)) return;
+        try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+        String line; int lineNumber = 0;
+        while ((line = reader.readLine()) != null) {
+            lineNumber++;
             if (line.isBlank() || line.startsWith("#")) continue;
             try {
                 Entry e = parse(line);
+                if (e.revision() < 1 || e.authorityEpoch() < 1 || e.updatedAtMillis() < 1 || e.regionId().isBlank() || e.key().worldId().isBlank() || e.key().dimensionId().isBlank())
+                    throw new IllegalArgumentException("Invalid persistence identity/revision");
                 latest.merge(e.key(), e, (a,b) -> a.revision() >= b.revision() ? a : b);
                 revision.accumulateAndGet(e.revision(), Math::max);
                 if (file.equals(walFile)) walEntries++;
-            } catch (Exception ignored) {}
+            } catch (RuntimeException ex) {
+                throw new IOException("Invalid persistence record in " + file.getFileName() + " at line " + lineNumber + "; restore/reconcile the journal before starting", ex);
+            }
+        }
         }
     }
 
     private Entry parse(String line) {
         String[] p = line.split("\\t", -1);
-        if (p.length < 10) throw new IllegalArgumentException("bad persistent journal row");
+        if (p.length != 10) throw new IllegalArgumentException("bad persistent journal row");
         BlockKey key = new BlockKey(dec(p[0]), dec(p[1]), Integer.parseInt(p[4]), Integer.parseInt(p[5]), Integer.parseInt(p[6]));
         return new Entry(key, dec(p[2]), Long.parseLong(p[3]), dec(p[7]), Long.parseLong(p[8]), Long.parseLong(p[9]));
     }
@@ -142,19 +154,25 @@ final class PersistentBlockJournal implements AutoCloseable {
     }
 
     private synchronized void compactSafe() {
+        if (writeFailed) return; // Never compact uncertain writes out of the WAL.
         try { compact(); }
         catch (Exception e) { log.warn("Persistent block journal compaction failed: " + e.getMessage()); }
+        finally { nextCompaction = walEntries + 4096; }
     }
 
     private void compact() throws IOException {
         if (!enabled) return;
-        Path tmp = snapshotFile.resolveSibling(snapshotFile.getFileName() + ".tmp");
         StringBuilder b = new StringBuilder("# Foundations persistent block journal 0.0.5a.R7.R4\n");
         latest.values().stream().sorted(Comparator.comparingLong(Entry::revision)).forEach(e -> b.append(line(e)));
-        Files.writeString(tmp, b.toString(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        try { Files.move(tmp, snapshotFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
-        catch (AtomicMoveNotSupportedException ex) { Files.move(tmp, snapshotFile, StandardCopyOption.REPLACE_EXISTING); }
-        Files.writeString(walFile, "", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        boolean directoryForced = DurableFiles.replace(snapshotFile, b.toString().getBytes(StandardCharsets.UTF_8));
+        if (!directoryForced) {
+            log.warn("Snapshot written, but directory sync unavailable; retaining recovery WAL");
+            return;
+        }
+        try (FileChannel ch = FileChannel.open(walFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            ch.truncate(0);
+            ch.force(true);
+        }
         walEntries = 0;
     }
 

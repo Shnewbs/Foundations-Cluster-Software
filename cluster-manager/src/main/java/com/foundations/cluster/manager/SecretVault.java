@@ -54,33 +54,37 @@ final class SecretVault {
         c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key,"AES"), new GCMParameterSpec(128, nonce));
         c.updateAAD(name.getBytes(StandardCharsets.UTF_8));
         byte[] cipher = c.doFinal(value.getBytes(StandardCharsets.UTF_8));
+        String previous = encrypted.getProperty(name);
         encrypted.setProperty(name, Base64.getEncoder().encodeToString(nonce)+"."+Base64.getEncoder().encodeToString(cipher));
-        save();
+        try { save(); } catch (IOException ex) {
+            if (previous == null) encrypted.remove(name); else encrypted.setProperty(name, previous);
+            throw ex;
+        }
     }
 
     private void save() throws IOException {
-        Path tmp = vaultFile.resolveSibling(vaultFile.getFileName()+".tmp");
-        try (OutputStream out = Files.newOutputStream(tmp, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            encrypted.store(out, "Foundations Cluster Runtime encrypted secrets. Do not edit.");
-        }
-        try { Files.move(tmp,vaultFile,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE); }
-        catch (AtomicMoveNotSupportedException e) { Files.move(tmp,vaultFile,StandardCopyOption.REPLACE_EXISTING); }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        encrypted.store(bytes, "Foundations Cluster Runtime encrypted secrets. Do not edit.");
+        DurableFiles.replace(vaultFile, bytes.toByteArray());
         tighten(vaultFile);
     }
 
     private byte[] loadOrCreateMasterKey() throws Exception {
+        Path expected = dir.resolve(isWindows() ? "vault-key.dpapi" : "vault-key.bin");
+        if (Files.exists(vaultFile) && !Files.isRegularFile(expected))
+            throw new IOException("Vault exists but its master key is missing; restore the matching security backup");
         if (isWindows()) {
             Path p = dir.resolve("vault-key.dpapi");
-            if (Files.isRegularFile(p)) return dpapiUnprotect(Files.readString(p,StandardCharsets.UTF_8).trim());
+            if (Files.isRegularFile(p)) return validateKey(dpapiUnprotect(Files.readString(p,StandardCharsets.UTF_8).trim()));
             byte[] raw = new byte[32]; RNG.nextBytes(raw);
             String protectedB64 = dpapiProtect(raw);
-            Files.writeString(p,protectedB64+System.lineSeparator(),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
+            DurableFiles.replace(p,(protectedB64+System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
             return raw;
         }
         Path p = dir.resolve("vault-key.bin");
-        if (Files.isRegularFile(p)) return Base64.getDecoder().decode(Files.readString(p,StandardCharsets.UTF_8).trim());
+        if (Files.isRegularFile(p)) return validateKey(Base64.getDecoder().decode(Files.readString(p,StandardCharsets.UTF_8).trim()));
         byte[] raw = new byte[32]; RNG.nextBytes(raw);
-        Files.writeString(p,Base64.getEncoder().encodeToString(raw)+System.lineSeparator(),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
+        DurableFiles.replace(p,(Base64.getEncoder().encodeToString(raw)+System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
         tighten(p);
         return raw;
     }
@@ -119,6 +123,11 @@ final class SecretVault {
             throw new IOException("Windows DPAPI operation failed" + (detail.isBlank()?"":": "+detail));
         }
         return out.lines().reduce((a,b)->b).orElse(out).trim();
+    }
+
+    private static byte[] validateKey(byte[] key) throws IOException {
+        if (key.length != 32) throw new IOException("Invalid vault key length");
+        return key;
     }
 
     private static void tighten(Path p) {

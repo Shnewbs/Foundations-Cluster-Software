@@ -23,35 +23,78 @@ final class Json {
     }
 
     static Map<String,String> flatObject(String json) {
-        Map<String,String> out = new LinkedHashMap<>();
-        if (json == null) return out;
-        int i = 0, n = json.length();
-        while (i < n && Character.isWhitespace(json.charAt(i))) i++;
-        if (i < n && json.charAt(i) == '{') i++;
-        while (i < n) {
-            while (i < n && (Character.isWhitespace(json.charAt(i)) || json.charAt(i)==',')) i++;
-            if (i >= n || json.charAt(i)=='}') break;
-            if (json.charAt(i)!='"') break;
-            int[] r = readString(json, i); String key = unescape(json.substring(i+1, r[0])); i = r[0]+1;
-            while (i<n && Character.isWhitespace(json.charAt(i))) i++;
-            if (i<n && json.charAt(i)==':') i++;
-            while (i<n && Character.isWhitespace(json.charAt(i))) i++;
-            String val;
-            if (i<n && json.charAt(i)=='"') { int[] v=readString(json,i); val=unescape(json.substring(i+1,v[0])); i=v[0]+1; }
-            else { int start=i; while (i<n && json.charAt(i)!=',' && json.charAt(i)!='}') i++; val=json.substring(start,i).trim(); }
-            out.put(key,val);
+        if (json == null || json.isBlank()) return new LinkedHashMap<>();
+        Parser parser = new Parser(json);
+        Map<String,String> result = parser.object(0);
+        parser.space();
+        if (parser.at != json.length()) throw parser.bad();
+        return result;
+    }
+
+    private static final class Parser {
+        final String text;
+        int at;
+        Parser(String text) { this.text=text; }
+        IllegalArgumentException bad() { return new IllegalArgumentException("Invalid JSON at offset " + at); }
+        void space() { while (at<text.length() && " \t\r\n".indexOf(text.charAt(at))>=0) at++; }
+        boolean take(char c) { space(); if(at<text.length() && text.charAt(at)==c){at++;return true;}return false; }
+        void need(char c) { if(!take(c))throw bad(); }
+        Map<String,String> object(int depth) {
+            if(depth>64)throw bad();
+            need('{');Map<String,String> out=new LinkedHashMap<>();
+            if(take('}'))return out;
+            do {
+                space();String key=string();need(':');String val=value(depth+1);
+                if(out.putIfAbsent(key,val)!=null)throw bad();
+                if(take('}'))return out;
+                need(',');
+            } while(true);
         }
-        return out;
-    }
-
-    private static int[] readString(String s, int start) {
-        boolean esc=false; int i=start+1;
-        for (; i<s.length(); i++) { char c=s.charAt(i); if (esc) esc=false; else if (c=='\\') esc=true; else if (c=='"') break; }
-        return new int[]{i};
-    }
-
-    private static String unescape(String s) {
-        return s.replace("\\n","\n").replace("\\r","\r").replace("\\t","\t").replace("\\\"","\"").replace("\\\\","\\");
+        String value(int depth) {
+            if(depth>64)throw bad();
+            space();if(at>=text.length())throw bad();
+            char c=text.charAt(at);
+            if(c=='"')return string();
+            int start=at;
+            if(c=='{') object(depth);
+            else if(c=='[') {
+                at++;if(!take(']')) { do {value(depth+1);if(take(']'))break;need(',');}while(true); }
+            } else {
+                while(at<text.length() && ",}] \t\r\n".indexOf(text.charAt(at))<0)at++;
+                String token=text.substring(start,at);
+                if(!token.equals("true") && !token.equals("false") && !token.equals("null")
+                        && !token.matches("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))throw bad();
+            }
+            return text.substring(start,at);
+        }
+        String string() {
+            if(at>=text.length() || text.charAt(at++)!='"')throw bad();
+            StringBuilder result=new StringBuilder();
+            while(at<text.length()) {
+                char c=text.charAt(at++);
+                if(c=='"')return result.toString();
+                if(c<32)throw bad();
+                if(c!='\\'){result.append(c);continue;}
+                if(at>=text.length())throw bad();
+                char escaped=text.charAt(at++);
+                switch(escaped) {
+                    case '"','\\','/' -> result.append(escaped);
+                    case 'b' -> result.append('\b');
+                    case 'f' -> result.append('\f');
+                    case 'n' -> result.append('\n');
+                    case 'r' -> result.append('\r');
+                    case 't' -> result.append('\t');
+                    case 'u' -> {
+                        if(at+4>text.length())throw bad();
+                        int code=0;
+                        for(int i=0;i<4;i++){int digit=Character.digit(text.charAt(at++),16);if(digit<0)throw bad();code=(code<<4)|digit;}
+                        result.append((char)code);
+                    }
+                    default -> throw bad();
+                }
+            }
+            throw bad();
+        }
     }
 
     static int i(Map<String,String> m, String k, int d) { try { return Integer.parseInt(m.getOrDefault(k,Integer.toString(d))); } catch(Exception e){ return d; } }

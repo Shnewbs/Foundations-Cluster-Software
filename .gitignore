@@ -1,2 +1,21 @@
-# Generated build output; runtime worlds and operator state are never source payloads.
+# Generated code and build caches.
 **/build/
+**/.gradle/
+**/__pycache__/
+*.pyc
+/dist/
+
+# Installation data must never become source or updater payloads.
+/config/cluster.properties
+/runtime/
+/workers/
+/world/
+/worlds/
+/logs/
+/TestReports/
+/support-bundles/
+/update-backups/
+/.foundations_update_backups/
+/server-template/
+/velocity/*
+!/velocity/.foundations-proxy-runtime

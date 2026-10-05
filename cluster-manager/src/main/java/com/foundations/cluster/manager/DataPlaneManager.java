@@ -29,8 +29,9 @@ final class DataPlaneManager implements AutoCloseable {
     private final AtomicLong published=new AtomicLong(),delivered=new AtomicLong(),acked=new AtomicLong(),rejected=new AtomicLong(),dropped=new AtomicLong(),bytes=new AtomicLong();
     private final AtomicLong chunkRequests=new AtomicLong(),chunkSnapshots=new AtomicLong(),snapshotBytes=new AtomicLong();
     private final AtomicLong blockEntityCommits=new AtomicLong();
-    // HF10: coalesce mutation-driven replica invalidations per target/chunk.
-    private final ConcurrentHashMap<String,Long> replicaInvalidationAt=new ConcurrentHashMap<>();
+    // Coalesce only notifications still queued, never writes after a notification was sent.
+    private record InvalidationKey(String target, String world, String dimension, String region, long epoch, String payload) {}
+    private final Set<InvalidationKey> queuedInvalidations = ConcurrentHashMap.newKeySet();
 
     DataPlaneManager(ManagerConfig cfg, WorkerManager workers, SessionManager sessions, RegionAuthorityManager regions, ClusterLog log) {
         this.cfg=cfg;this.workers=workers;this.sessions=sessions;this.regions=regions;this.log=log;
@@ -76,13 +77,16 @@ final class DataPlaneManager implements AutoCloseable {
         // R7.R4/R7.R5 manager-resident durable mutation commits. These frames are
         // consumed by the manager rather than relayed to another worker.
         if(kind.equals("PERSIST_BLOCK_ENTITY")){
+            synchronized (regions) {
             if(regionId.isBlank())throw reject("PERSIST_BLOCK_ENTITY requires regionId");
             RegionRecord r=regions.get(regionId);if(r==null)throw reject("unknown authority region: "+regionId);
             if(r.state!=RegionState.ACTIVE)throw reject("persistent BlockEntity commit requires ACTIVE authority region: "+r.state);
             if(!source.equals(r.ownerWorkerId))throw reject("persistent BlockEntity commit source does not own region");
+            if(System.currentTimeMillis() >= r.leaseExpiresAtMillis)throw reject("authority lease expired");
             if(epoch!=r.epoch)throw reject("persistent BlockEntity commit uses stale authority epoch "+epoch+" current="+r.epoch);
-            String[] pp=payload.split("\\|",-1);if(pp.length<6)throw reject("bad PERSIST_BLOCK_ENTITY payload");
+            String[] pp=payload.split("\\|",-1);if(pp.length!=6 && pp.length!=7)throw reject("bad PERSIST_BLOCK_ENTITY payload");
             int x=Integer.parseInt(pp[0]),y=Integer.parseInt(pp[1]),z=Integer.parseInt(pp[2]);
+            if(!pp[3].equals("0") && !pp[3].equals("1"))throw reject("invalid BlockEntity presence flag");
             boolean present="1".equals(pp[3]);
             RegionKey coordinateRegion=regions.forBlock(worldId,dimensionId,x,z);
             if(!coordinateRegion.id().equals(regionId))throw reject("persistent BlockEntity coordinate does not belong to claimed region: expected="+coordinateRegion.id()+" claimed="+regionId);
@@ -100,15 +104,18 @@ final class DataPlaneManager implements AutoCloseable {
             if(beCount<=5 || beCount%1000==0) log.info("Persistent BlockEntity commits="+beCount+" latestRevision="+committed.revision()+" owner="+source+" pos="+x+","+y+","+z+" type="+typeId);
             fanoutChunkInvalidate(source,worldId,dimensionId,regionId,epoch,x,z);
             return f;
+            }
         }
 
         if(kind.equals("PERSIST_BLOCK")){
+            synchronized (regions) {
             if(regionId.isBlank())throw reject("PERSIST_BLOCK requires regionId");
             RegionRecord r=regions.get(regionId);if(r==null)throw reject("unknown authority region: "+regionId);
             if(r.state!=RegionState.ACTIVE)throw reject("persistent block commit requires ACTIVE authority region: "+r.state);
             if(!source.equals(r.ownerWorkerId))throw reject("persistent block commit source does not own region");
+            if(System.currentTimeMillis() >= r.leaseExpiresAtMillis)throw reject("authority lease expired");
             if(epoch!=r.epoch)throw reject("persistent block commit uses stale authority epoch "+epoch+" current="+r.epoch);
-            String[] pp=payload.split("\\|",-1);if(pp.length<4)throw reject("bad PERSIST_BLOCK payload");
+            String[] pp=payload.split("\\|",-1);if(pp.length!=4)throw reject("bad PERSIST_BLOCK payload");
             int x=Integer.parseInt(pp[0]),y=Integer.parseInt(pp[1]),z=Integer.parseInt(pp[2]);
             RegionKey coordinateRegion=regions.forBlock(worldId,dimensionId,x,z);
             if(!coordinateRegion.id().equals(regionId))throw reject("persistent block coordinate does not belong to claimed region: expected="+coordinateRegion.id()+" claimed="+regionId);
@@ -119,6 +126,7 @@ final class DataPlaneManager implements AutoCloseable {
             log.info("Persistent block commit region="+regionId+" owner="+source+" epoch="+epoch+" revision="+committed.revision()+" pos="+x+","+y+","+z);
             fanoutChunkInvalidate(source,worldId,dimensionId,regionId,epoch,x,z);
             return f;
+            }
         }
 
         SessionRecord session=sessionId.isBlank()?null:sessions.get(sessionId);
@@ -158,10 +166,9 @@ final class DataPlaneManager implements AutoCloseable {
             String id=id();DataPlaneFrame f=new DataPlaneFrame(id,kind,source,target,sessionId,playerId,worldId,dimensionId,regionId,epoch,payload);
             published.incrementAndGet();acked.incrementAndGet();recordRecent(f);return f;
         }
-        var q=pending.computeIfAbsent(target,k->new ConcurrentLinkedDeque<>());
-        while(q.size()>=maxQueue()){DataPlaneFrame old=q.pollFirst();if(old!=null)dropped.incrementAndGet();else break;}
         String id=id();DataPlaneFrame f=new DataPlaneFrame(id,kind,source,target,sessionId,playerId,worldId,dimensionId,regionId,epoch,payload);
-        q.addLast(f);published.incrementAndGet();bytes.addAndGet(payloadBytes);
+        if (!enqueue(f)) return f;
+        published.incrementAndGet();bytes.addAndGet(payloadBytes);
         if(kind.equals("CHUNK_REQUEST"))chunkRequests.incrementAndGet();
         if(kind.equals("CHUNK_SNAPSHOT")){chunkSnapshots.incrementAndGet();snapshotBytes.addAndGet(payloadBytes);}
         recordRecent(f);
@@ -171,21 +178,38 @@ final class DataPlaneManager implements AutoCloseable {
     /** HF10: a durable authority mutation makes any active remote anchor replica stale immediately. */
     private void fanoutChunkInvalidate(String source,String worldId,String dimensionId,String regionId,long epoch,int blockX,int blockZ){
         int chunkX=Math.floorDiv(blockX,16),chunkZ=Math.floorDiv(blockZ,16);
-        long now=System.currentTimeMillis();
         for(SessionRecord session:sessions.all()){
             if(!regionId.equals(session.regionId))continue;
             String target=session.anchorWorkerId;
             if(target==null||target.isBlank()||target.equals(source)||workers.get(target)==null)continue;
-            String throttleKey=target+"|"+dimensionId+"|"+chunkX+"|"+chunkZ+"|"+epoch;
-            Long prior=replicaInvalidationAt.put(throttleKey,now);
-            if(prior!=null&&now-prior<100L)continue;
             String payload=chunkX+"|"+chunkZ;
             DataPlaneFrame invalidate=new DataPlaneFrame(id(),"CHUNK_INVALIDATE",source,target,session.sessionId,session.playerId,worldId,dimensionId,regionId,epoch,payload);
-            var q=pending.computeIfAbsent(target,k->new ConcurrentLinkedDeque<>());
-            while(q.size()>=maxQueue()){DataPlaneFrame old=q.pollFirst();if(old!=null)dropped.incrementAndGet();else break;}
-            q.addLast(invalidate);published.incrementAndGet();bytes.addAndGet(payload.getBytes(StandardCharsets.UTF_8).length);recordRecent(invalidate);
+            if (enqueue(invalidate)) {
+                published.incrementAndGet();bytes.addAndGet(payload.getBytes(StandardCharsets.UTF_8).length);recordRecent(invalidate);
+            }
         }
-        if(replicaInvalidationAt.size()>8192){long cutoff=now-Math.max(10000L,ttlMillis()*2);replicaInvalidationAt.entrySet().removeIf(e->e.getValue()<cutoff);}
+    }
+
+    private InvalidationKey invalidationKey(DataPlaneFrame f) {
+        return new InvalidationKey(f.targetWorkerId, f.worldId, f.dimensionId, f.regionId, f.authorityEpoch, f.payload);
+    }
+
+    private void dequeued(DataPlaneFrame f) {
+        if (f.kind.equals("CHUNK_INVALIDATE")) queuedInvalidations.remove(invalidationKey(f));
+    }
+
+    private boolean enqueue(DataPlaneFrame f) {
+        var q=pending.computeIfAbsent(f.targetWorkerId,k->new ConcurrentLinkedDeque<>());
+        synchronized (q) {
+            long now=System.currentTimeMillis();
+            q.removeIf(old -> {if(now-old.createdAtMillis>ttlMillis()){dequeued(old);dropped.incrementAndGet();return true;}return false;});
+            if (f.kind.equals("CHUNK_INVALIDATE") && !queuedInvalidations.add(invalidationKey(f))) return false;
+            while (q.size() >= maxQueue()) {
+                DataPlaneFrame old=q.removeFirst();dequeued(old);dropped.incrementAndGet();
+            }
+            q.addLast(f);
+            return true;
+        }
     }
 
     String pollBundle(String workerId,int requestedMax){
@@ -196,15 +220,20 @@ final class DataPlaneManager implements AutoCloseable {
         var in=inflight.computeIfAbsent(workerId,k->new ConcurrentHashMap<>());
         List<DataPlaneFrame> out=new ArrayList<>();
 
+        synchronized (q) {
+        // Bound unacknowledged frames as well as the pending queue.
+        in.values().removeIf(f -> {if(now-f.createdAtMillis>ttlMillis()){dropped.incrementAndGet();return true;}return false;});
         // Retry timed-out inflight frames first.
         for(DataPlaneFrame f:in.values().stream().sorted(Comparator.comparingLong(a->a.createdAtMillis)).toList()){
             if(out.size()>=max)break;
             if(now-f.lastDeliveryAtMillis>=retryMillis()){markDelivery(f,now);out.add(f);}
         }
-        while(out.size()<max){
+        while(out.size()<max && in.size()<maxQueue()){
             DataPlaneFrame f=q.pollFirst();if(f==null)break;
+            dequeued(f);
             if(now-f.createdAtMillis>ttlMillis()){dropped.incrementAndGet();continue;}
             in.put(f.id,f);markDelivery(f,now);out.add(f);
+        }
         }
         if(out.isEmpty())return "";
         StringBuilder b=new StringBuilder();
@@ -265,6 +294,6 @@ final class DataPlaneManager implements AutoCloseable {
         return String.join("\t",enc(f.id),enc(f.kind),enc(f.sourceWorkerId),enc(f.targetWorkerId),enc(f.sessionId),enc(f.playerId),enc(f.worldId),enc(f.dimensionId),enc(f.regionId),Long.toString(f.authorityEpoch),enc(f.payload));
     }
     private void cleanupSafe(){try{cleanup();}catch(Throwable t){log.warn("Data-plane cleanup failed: "+t.getMessage());}}
-    private void cleanup(){long now=System.currentTimeMillis();for(var q:pending.values())q.removeIf(f->{boolean x=now-f.createdAtMillis>ttlMillis();if(x)dropped.incrementAndGet();return x;});for(var m:inflight.values())for(var e:new ArrayList<>(m.entrySet()))if(now-e.getValue().createdAtMillis>ttlMillis()){if(m.remove(e.getKey(),e.getValue()))dropped.incrementAndGet();}}
-    @Override public void close(){cleanup.shutdownNow();pending.clear();inflight.clear();persistence.close();blockEntityPersistence.close();}
+    private void cleanup(){long now=System.currentTimeMillis();for(var q:pending.values()){synchronized(q){q.removeIf(f->{boolean x=now-f.createdAtMillis>ttlMillis();if(x){dequeued(f);dropped.incrementAndGet();}return x;});}}for(var m:inflight.values())for(var e:new ArrayList<>(m.entrySet()))if(now-e.getValue().createdAtMillis>ttlMillis()){if(m.remove(e.getKey(),e.getValue()))dropped.incrementAndGet();}}
+    @Override public void close(){cleanup.shutdownNow();pending.clear();inflight.clear();queuedInvalidations.clear();persistence.close();blockEntityPersistence.close();}
 }

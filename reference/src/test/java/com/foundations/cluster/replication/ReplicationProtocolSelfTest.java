@@ -15,12 +15,36 @@ public final class ReplicationProtocolSelfTest {
     public static void main(String[] args) throws Exception {
         Path root = Files.createTempDirectory("foundations-v22-model-");
         try {
-            restartMatrix(root); abortAndIdentity(root); tornTailAndCorruption(root); timeSkew();
+            restartMatrix(root); abortAndIdentity(root); tornTailAndCorruption(root); semanticCorruption(root); timeSkew();
             System.out.println("World Replication v2.2 protocol model: " + checks + " checks PASS");
         } finally {
             try (var paths = Files.walk(root)) {
                 for (Path p : paths.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
             }
+        }
+    }
+    private static void semanticCorruption(Path root) throws Exception {
+        Path good = root.resolve("semantic-good");
+        try (var ledger = new PlayerOperationLedger(good, CLUSTER, PLAYER)) {
+            var id=ledger.prepare(SLOT).id();
+            ledger.advance(id, Stage.WORLD_EXECUTED, null);
+            ledger.advance(id, Stage.WORLD_RESULT_DURABLE, RESULT);
+            ledger.advance(id, Stage.PLAYER_COMMITTED, RESULT);
+        }
+        byte[] data=Files.readAllBytes(good);
+        var records=new java.util.ArrayList<byte[]>();
+        for (int offset=0;offset<data.length;) {
+            int length=java.nio.ByteBuffer.wrap(data,offset,4).getInt()+8;
+            records.add(java.util.Arrays.copyOfRange(data,offset,offset+length));offset+=length;
+        }
+        int count=0;
+        for (int[] order : new int[][] {{2}, {0,2}, {0,1,3}, {0,0}, {0,1,2,1}}) {
+            var out=new java.io.ByteArrayOutputStream();
+            for (int index:order) out.write(records.get(index));
+            Path corrupt=root.resolve("semantic-corrupt-"+count++);Files.write(corrupt,out.toByteArray());
+            reject(() -> {try(var ledger=new PlayerOperationLedger(corrupt,CLUSTER,PLAYER)) {}},
+                "valid checksums cannot authorize skipped/replayed transitions");
+            check(java.util.Arrays.equals(Files.readAllBytes(corrupt),out.toByteArray()), "semantic failure preserves evidence");
         }
     }
     private static void restartMatrix(Path root) throws Exception {

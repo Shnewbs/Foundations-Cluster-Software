@@ -401,15 +401,17 @@ final class RegionAuthorityManager implements AutoCloseable {
     }
 
     private void load() throws IOException {
-        if (!Files.isRegularFile(stateFile)) return;
+        DurableFiles.validateJournal(stateFile);
+        if (!Files.exists(stateFile)) return;
         for (String line : Files.readAllLines(stateFile, StandardCharsets.UTF_8)) {
             if (line.isBlank() || line.startsWith("#")) continue;
             try {
                 String[] p = line.split("\\t", -1);
-                if (p.length < 11) continue;
+                if (p.length != 11) throw new IllegalArgumentException("Invalid authority row");
                 RegionKey key = new RegionKey(dec(p[0]), dec(p[1]), Integer.parseInt(p[2]), Integer.parseInt(p[3]));
                 RegionRecord r = new RegionRecord(key, dec(p[4]), dec(p[5]), Long.parseLong(p[6]), Long.parseLong(p[7]), RegionState.valueOf(p[8]));
                 r.previousOwnerWorkerId = dec(p[9]); r.note = dec(p[10]);
+                if(r.epoch < 1 || regions.containsKey(key)) throw new IllegalArgumentException("Invalid/duplicate authority epoch");
                 regions.put(key, r);
                 if (!r.ownerWorkerId.isBlank() && r.state != RegionState.UNASSIGNED && r.state != RegionState.FROZEN) {
                     startupRecoveryRegions.add(key);
@@ -418,28 +420,25 @@ final class RegionAuthorityManager implements AutoCloseable {
                     r.leaseExpiresAtMillis = Math.max(r.leaseExpiresAtMillis, startupRecoveryUntilMillis);
                     r.note = "waiting for persisted owner startup";
                 }
-            } catch (Exception ignored) {}
+            } catch (RuntimeException ex) { throw new IOException("Invalid Region Authority recovery state; restore/reconcile before starting", ex); }
         }
         if (!regions.isEmpty()) log.info("Restored " + regions.size() + " Region Authority record(s) from runtime state; startup owner recovery grace=" + startupRecoverySeconds() + "s");
     }
 
     private synchronized void flushSafe() { if (!dirty) return; try { flush(); } catch (Exception e) { log.warn("Could not persist Region Authority state: " + e.getMessage()); } }
     private synchronized void flush() throws IOException {
-        Path tmp = stateFile.resolveSibling(stateFile.getFileName()+".tmp");
         StringBuilder b = new StringBuilder("# Foundations Region Authority 0.0.4a\n");
         for (RegionRecord r : regions.values().stream().sorted(Comparator.comparing(a -> a.key.id())).toList()) {
             b.append(enc(r.key.worldId())).append('\t').append(enc(r.key.dimensionId())).append('\t').append(r.key.regionX()).append('\t').append(r.key.regionZ()).append('\t')
                     .append(enc(r.ownerWorkerId)).append('\t').append(enc(r.leaseId)).append('\t').append(r.epoch).append('\t').append(r.leaseExpiresAtMillis).append('\t')
                     .append(r.state.name()).append('\t').append(enc(r.previousOwnerWorkerId)).append('\t').append(enc(r.note)).append('\n');
         }
-        Files.writeString(tmp,b.toString(),StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING);
-        try { Files.move(tmp,stateFile,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE); }
-        catch (AtomicMoveNotSupportedException e) { Files.move(tmp,stateFile,StandardCopyOption.REPLACE_EXISTING); }
+        DurableFiles.replace(stateFile,b.toString().getBytes(StandardCharsets.UTF_8));
         dirty=false;
     }
 
     private static String enc(String s) { return Base64.getUrlEncoder().withoutPadding().encodeToString((s==null?"":s).getBytes(StandardCharsets.UTF_8)); }
     private static String dec(String s) { return new String(Base64.getUrlDecoder().decode(s),StandardCharsets.UTF_8); }
 
-    @Override public void close() { scheduler.shutdownNow(); try { flush(); } catch (Exception ignored) {} }
+    @Override public void close() { scheduler.shutdownNow(); try { flush(); } catch (Exception ex) { log.warn("Could not persist Region Authority on shutdown: " + ex.getMessage()); } }
 }

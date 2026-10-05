@@ -21,7 +21,7 @@ public final class NodeStartupSelfTest {
   Properties build=new Properties();try(var in=Files.newInputStream(Path.of(args[0],"minecraft-agent/gradle.properties"))){build.load(in);}
   check(ClusterVersion.NODE_VERSION.equals(build.getProperty("mod_version")),"Manager/Gradle release parity");
   check(ClusterVersion.NODE_VERSION.equals("0.0.6a.R13"),"R13 required");
-  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.6a.R19-HF11"),"repair package marker");
+  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.6a.R19-HF12"),"repair package marker");
   Path home=Files.createTempDirectory("foundations-nodefix-");
   try{
    Files.createDirectories(home.resolve("config"));Files.writeString(home.resolve("config/cluster.properties"),"worker.templateDir=custom template\nworld.seed=1234\nworld.identity.enforce=false\nworld.environment.enabled=false\n");
@@ -59,6 +59,7 @@ public final class NodeStartupSelfTest {
    }
    Files.delete(mods.resolve(current));Files.delete(cache.resolve(current));
    Files.writeString(home.resolve("minecraft-agent/build_mod.sh"),"#!/bin/sh\nprintf '%s' \"$*\" > build-args.txt\nexit 0\n");
+   Files.writeString(home.resolve("minecraft-agent/build_mod.bat"),"@echo off\r\ntype nul > build-args.txt\r\nif not \"%*\"==\"\" echo %* > build-args.txt\r\nexit /b 0\r\n");
    for(int n=0;n<3;n++){node.buildAndInstallAsync();waitFor(node);}
    check(!node.mayAutoRetry()&&node.statusJson().contains("\"automaticBuildPaused\":true"),"three failed outputs pause automatic rebuilds");
    check(node.statusJson().contains("Expected Cluster Node 0.0.6a.R13")&&node.statusJson().contains(old),"diagnostic includes expected/found files");

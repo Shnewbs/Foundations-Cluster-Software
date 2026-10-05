@@ -161,10 +161,28 @@ public final class PlayerOperationLedger implements AutoCloseable {
             if (!op.id.cluster.equals(cluster) || !op.id.player.equals(player))
                 throw new IOException("Ledger belongs to another cluster/player");
             if (op.id.counter == Long.MAX_VALUE) throw new IOException("Invalid counter");
+            validateReplay(op);
             operations.put(op.id.counter, op);
             nextCounter = Math.max(nextCounter, op.id.counter + 1);
             offset += length + 8L;
         }
+    }
+    private void validateReplay(Operation op) throws IOException {
+        Operation old = operations.get(op.id.counter);
+        if (old == null) {
+            if (op.id.counter != nextCounter || op.stage != Stage.PREPARED || op.result != null)
+                throw new IOException("Ledger starts an operation out of order");
+            if (slotReserved(op.reservation.slot)) throw new IOException("Ledger reserves an occupied slot");
+            return;
+        }
+        boolean abort = op.stage == Stage.ABORTED &&
+            (old.stage == Stage.PREPARED || old.stage == Stage.WORLD_EXECUTED);
+        boolean next = old.stage != Stage.ABORTED && old.stage != Stage.CLIENT_ACKED &&
+            op.stage.ordinal() == old.stage.ordinal() + 1;
+        if (!old.reservation.equals(op.reservation) || (!abort && !next))
+            throw new IOException("Illegal ledger transition or changed reservation");
+        if (op.stage != Stage.WORLD_RESULT_DURABLE && !Objects.equals(old.result, op.result))
+            throw new IOException("Ledger result changed outside durability transition");
     }
     private void truncateTail(long offset) throws IOException { channel.truncate(offset); channel.force(true); }
     private void readFully(ByteBuffer buffer, long offset) throws IOException {

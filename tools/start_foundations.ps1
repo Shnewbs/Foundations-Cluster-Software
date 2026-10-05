@@ -7,6 +7,9 @@ $ConfigDir = Join-Path $Root "config"
 $ConfigFile = Join-Path $ConfigDir "cluster.properties"
 $DefaultConfig = Join-Path $ConfigDir "cluster.properties.default"
 $ExpectedVersion = "0.0.6a.R19"
+if (Test-Path -LiteralPath (Join-Path $Root 'runtime/update-in-progress.json')) {
+    throw 'An update was interrupted. Use the updater rollback command and the backup recorded in runtime/update-in-progress.json before starting.'
+}
 
 function Get-JavaVersionText([string]$JavaPath) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo

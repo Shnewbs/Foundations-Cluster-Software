@@ -14,7 +14,8 @@ if ($sources.Count -eq 0) { throw 'Reference Java source is missing' }
 & (Join-Path $jdk 'bin\javac.exe') --release 21 -encoding UTF-8 -d $build "@$argfile"
 if ($LASTEXITCODE -ne 0) { throw 'Reference compilation failed' }
 foreach ($test in @('com.foundations.cluster.transfer.RegionTransferCoordinatorSelfTest',
-    'com.foundations.cluster.persistence.PersistentRegionTransferSelfTest')) {
+    'com.foundations.cluster.persistence.PersistentRegionTransferSelfTest',
+    'com.foundations.cluster.replication.ReplicationProtocolSelfTest')) {
     & (Join-Path $jdk 'bin\java.exe') -cp $build $test
     if ($LASTEXITCODE -ne 0) { throw "Failed: $test" }
 }
