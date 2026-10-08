@@ -43,6 +43,15 @@ jobs:
           & tools/build_manager.ps1
           & tools/build_simulator.ps1
           & tools/build_reference.ps1
+      - name: Install isolated gateway compiler for validation
+        if: runner.os == 'Windows'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Build and exercise real Conduit bridge and Windows bootstrap
+        if: runner.os == 'Windows'
+        run: python tools/validate_gateway.py
       - name: Build updater from tested source
         if: runner.os == 'Windows'
         run: python tools/package_updater.py
@@ -83,5 +92,5 @@ jobs:
           if gh release view "v$version" >/dev/null 2>&1; then
             echo "Release v$version already exists; immutable assets left unchanged."
           else
-            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — control-plane hardening" --notes-file "release_notes/$version.md"
+            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — gateway bootstrap repair" --notes-file "release_notes/$version.md"
           fi

@@ -1,24 +1,32 @@
-Foundations Cluster 0.0.6a.R19-HF12 control-plane updater (pre-release)
+Foundations Cluster 0.0.6a.R19-HF13 gateway bootstrap repair (pre-release)
 
-Requires an existing HF11 installation with Node R13. This package updates the
-Manager, Argon2 dependency and guarded Windows launcher. Node and gateway are
-unchanged. This is not a fresh installation or completed World Replication v2.2.
+For an existing stopped HF11, HF12 or HF13 installation with Node R13.
+This includes the HF12 Manager hardening and fixes the missing R19 bridge class
+failure. It includes the compiled Conduit bridge, gateway plugin and their source.
+The isolated gateway Java 25 runtime can remain a JRE when using these binaries.
+Manager and Minecraft workers remain on Java 21.
 
-1. Stop Manager, gateway and all workers. Keep your normal off-machine backup.
+1. Stop Manager, gateway and every worker. Keep your normal off-machine backup.
 2. Extract this entire ZIP into a separate folder, such as Downloads.
-3. Run APPLY_UPDATE.bat and enter your existing Cluster installation folder.
-4. Start the cluster and sign in again. Older remembered sessions are invalidated.
+3. Run APPLY_UPDATE.bat and enter the existing Cluster installation folder:
+   C:\Users\ProArt\Desktop\Foundations-Cluster-Software-main
+4. Start Cluster normally. Gateway setup applies and verifies the bundled bridge.
 
-The updater verifies every payload checksum, backs up all replaced files and
-attempts rollback on failure. Worlds, runtime/security, journals and active
-config are excluded from its payload. Never copy payload directly over a live
-installation. Download updater assets from the project's GitHub Releases page;
-the automatically generated source-code archives are for development.
+No full source download or manual Java installation is needed for this update.
+The updater verifies every payload checksum and backs up all replaced files.
+Worlds, runtime/security, journals, active config and Node R13 are excluded.
+Gateway setup preserves the forwarding secret and backs up the proxy core before
+applying the bridge. Do not copy payload directly over a live installation.
 
-Manual rollback (cluster must be stopped):
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\apply_update.ps1 -ClusterRoot "C:\Your\Cluster" -Rollback "C:\Your\Cluster\update-backups\HF12-..."
+A fresh source ZIP needs an initial launch to create config and build Manager.
+Source startup now compiles the gateway automatically with an isolated JDK 25.
+This updater is not a fresh installer and does not add live World Replication v2.2.
+
+Rollback (cluster must be stopped):
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\apply_update.ps1 -ClusterRoot "C:\Your\Cluster" -Rollback "C:\Your\Cluster\update-backups\HF13-..."
 
 If interrupted, use the backup recorded in runtime/update-in-progress.json.
-Do not delete that marker merely to bypass recovery. Keep the updater ZIP so its
-rollback command remains available. Directory flush support varies by platform;
-on Windows, recovery journals may grow because compaction keeps the WAL.
+Keep this ZIP for rollback. Older HF12 backups must use the HF12 updater.
+The transaction restores the payload files; gateway runtime changes made by a
+later startup are separate. This release recompiles the existing R19 bridge
+behavior and does not change its protocol. Live client acceptance remains required.

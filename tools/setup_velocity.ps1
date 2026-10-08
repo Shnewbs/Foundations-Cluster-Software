@@ -103,9 +103,9 @@ function Test-Java25([string]$Path) {
   return ((Get-JavaMajor $Path) -ge 25)
 }
 
-function Install-GatewayJava25 {
-  if(Test-Java25 $GatewayJavaExe){
-    Write-Host "[Foundations Cluster] Gateway JRE 25 validated."
+function Install-GatewayJava25([switch]$RequireCompiler) {
+  if((Test-Java25 $GatewayJavaExe) -and (!$RequireCompiler -or ((Test-Path -LiteralPath (Join-Path $GatewayJavaHome "bin/javac.exe")) -and (Test-Path -LiteralPath (Join-Path $GatewayJavaHome "bin/jar.exe"))))){
+    Write-Host "[Foundations Cluster] Gateway Java 25 validated."
     return
   }
 
@@ -113,7 +113,8 @@ function Install-GatewayJava25 {
   $arch = if($env:PROCESSOR_ARCHITECTURE -match 'ARM64'){ 'aarch64' } else { 'x64' }
   $headers=@{ "User-Agent"=$UserAgent; "Accept"="application/json" }
   $asset=$null
-  foreach($imageType in @("jre","jdk")){
+  $imageTypes = if($RequireCompiler){ @("jdk") } else { @("jre","jdk") }
+  foreach($imageType in $imageTypes){
     try {
       $uri="https://api.adoptium.net/v3/assets/latest/25/hotspot?architecture=$arch&image_type=$imageType&os=windows"
       $assets=@(Invoke-RestMethod -Headers $headers -Uri $uri -TimeoutSec 45)
@@ -163,7 +164,37 @@ function Install-GatewayJava25 {
   }
 }
 
-Install-GatewayJava25
+$BridgeJar = Join-Path $Root "velocity-gateway/build/libs/foundations_conduit_bridge-$GatewayVersion.jar"
+$BundledPlugin = Join-Path $Root "velocity-gateway/build/libs/foundations_velocity_gateway-$GatewayVersion.jar"
+$GatewayPlugin = Join-Path $PluginsDir "foundations_velocity_gateway-$GatewayVersion.jar"
+$BridgePrefix = 'com/velocitypowered/proxy/connection/backend/'
+$BridgeRequired = @('SeamlessConfigSessionHandler.class','FoundationsHandshakeCapture.class','FoundationsHandshakeCapture$Transcript.class','FoundationsHandshakeCapture$Cursor.class','FoundationsHandshakeCapture$1.class','FoundationsTagConfiguration.class','FoundationsNeoForgeConfiguration.class')
+function Test-ConduitBridgeJar([string]$Path) {
+  if(!(Test-Path -LiteralPath $Path -PathType Leaf)){return $false}
+  try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    $zip=[IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+      foreach($name in $BridgeRequired){if($null -eq $zip.GetEntry($BridgePrefix+$name)){return $false}}
+      $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      foreach($entry in $zip.Entries){
+        if(!$seen.Add($entry.FullName)){return $false}
+        if(!$entry.FullName.EndsWith('.class')){continue}
+        if($entry.FullName -notmatch '^com/velocitypowered/proxy/connection/backend/(SeamlessConfigSessionHandler|FoundationsHandshakeCapture|FoundationsTagConfiguration|FoundationsNeoForgeConfiguration)(\$[^/]+)?\.class$'){return $false}
+        $stream=$entry.Open()
+        try {
+          $header=New-Object byte[] 8
+          $read=0
+          while($read -lt 8){$n=$stream.Read($header,$read,8-$read);if($n -eq 0){return $false};$read+=$n}
+          if([BitConverter]::ToString($header) -ne 'CA-FE-BA-BE-00-00-00-45'){return $false}
+        } finally {$stream.Dispose()}
+      }
+      return $true
+    } finally {$zip.Dispose()}
+  } catch {return $false}
+}
+$NeedsGatewayBuild = !(Test-ConduitBridgeJar $BridgeJar) -or (!(Test-VelocityPluginJar $GatewayPlugin) -and !(Test-VelocityPluginJar $BundledPlugin))
+Install-GatewayJava25 -RequireCompiler:$NeedsGatewayBuild
 
 # R15 keeps Conduit, a Velocity-compatible proxy core, because a normal Velocity
 # plugin cannot absorb Minecraft's 1.20.2+ backend Configuration phase. Conduit's
@@ -215,47 +246,48 @@ if($runtimeOk){
 }
 
 
-# R15 overlays one Conduit class so the existing backend connection phase
-# (including Proxy Compatible Forge / NeoForge responders) sees configuration
-# plugin messages before the seamless handler absorbs the destination CONFIGURATION phase.
-$ConduitPatchClass = Join-Path $Root "tools\conduit-r15-patch\SeamlessConfigSessionHandler.class"
-$ConduitPatchEntry = "com/velocitypowered/proxy/connection/backend/SeamlessConfigSessionHandler.class"
+# Source archives contain Java source; updaters carry these precompiled artifacts.
+# Build against the downloaded Conduit core, avoiding snapshot Maven dependencies.
+if($NeedsGatewayBuild){
+  & (Join-Path $Root 'tools/build_gateway.ps1') -ConduitJar $VelocityJar -JavaHome $GatewayJavaHome
+}
+if(!(Test-ConduitBridgeJar $BridgeJar)){throw 'R19 bridge bundle is missing or invalid after gateway build.'}
 
 function Install-FoundationsConduitR15Patch {
-  if(!(Test-ConduitJar $VelocityJar)){throw "Conduit 1.8.0 is unavailable"}
-  $patchFolder=Split-Path -Parent $ConduitPatchClass
-  $patchFiles=@(Get-ChildItem -LiteralPath $patchFolder -Filter '*.class' -File)
-  foreach($required in @('SeamlessConfigSessionHandler.class','FoundationsHandshakeCapture.class','FoundationsHandshakeCapture$Transcript.class','FoundationsHandshakeCapture$Cursor.class','FoundationsHandshakeCapture$1.class','FoundationsTagConfiguration.class','FoundationsNeoForgeConfiguration.class')){
-    if(-not ($patchFiles.Name -contains $required)){throw "R19 bridge class missing: $required"}
-  }
+  if(!(Test-ConduitJar $VelocityJar)){throw 'Conduit 1.8.0 is unavailable'}
   $backupDir=Join-Path $VelocityDir 'runtime-backup'
   New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
   $backup=Join-Path $backupDir 'conduit-1.8.0-pre-foundations-r19.jar'
   if(!(Test-Path -LiteralPath $backup)){Copy-Item -LiteralPath $VelocityJar -Destination $backup}
-  Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
   $patchTarget=$VelocityJar+'.r19-staging'
+  $bundle=[IO.Compression.ZipFile]::OpenRead($BridgeJar)
   try {
+    $classes=@($bundle.Entries | Where-Object {$_.FullName.EndsWith('.class')})
     Copy-Item -LiteralPath $VelocityJar -Destination $patchTarget -Force
     $zip=[IO.Compression.ZipFile]::Open($patchTarget,[IO.Compression.ZipArchiveMode]::Update)
-    try {foreach($patchFile in $patchFiles){
-      $name='com/velocitypowered/proxy/connection/backend/'+$patchFile.Name
-      $existing=$zip.GetEntry($name);if($null -ne $existing){$existing.Delete()}
-      $entry=$zip.CreateEntry($name,[IO.Compression.CompressionLevel]::Optimal);$stream=$entry.Open()
-      try{$classBytes=[IO.File]::ReadAllBytes($patchFile.FullName);$stream.Write($classBytes,0,$classBytes.Length)}finally{$stream.Dispose()}
+    try {foreach($class in $classes){
+      $existing=$zip.GetEntry($class.FullName);if($null -ne $existing){$existing.Delete()}
+      $entry=$zip.CreateEntry($class.FullName,[IO.Compression.CompressionLevel]::Optimal)
+      $input=$class.Open();$output=$entry.Open()
+      try{$input.CopyTo($output)}finally{$input.Dispose();$output.Dispose()}
     }}finally{$zip.Dispose()}
     $zip=[IO.Compression.ZipFile]::OpenRead($patchTarget);$sha=[Security.Cryptography.SHA256]::Create()
-    try {foreach($patchFile in $patchFiles){
-      $entry=$zip.GetEntry('com/velocitypowered/proxy/connection/backend/'+$patchFile.Name)
-      if($null -eq $entry){throw "R19 bridge verification: missing $($patchFile.Name)"}
-      $stream=$entry.Open();$ms=New-Object IO.MemoryStream
-      try{$stream.CopyTo($ms)}finally{$stream.Dispose()}
-      $have=[BitConverter]::ToString($sha.ComputeHash($ms.ToArray()));$ms.Dispose()
-      $want=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($patchFile.FullName)))
-      if($have -ne $want){throw "R19 bridge verification failed: $($patchFile.Name)"}
+    try {foreach($class in $classes){
+      $entry=$zip.GetEntry($class.FullName)
+      if($null -eq $entry){throw "R19 bridge verification: missing $($class.FullName)"}
+      $input=$class.Open();$output=$entry.Open()
+      try{
+        $want=[BitConverter]::ToString($sha.ComputeHash($input))
+        $have=[BitConverter]::ToString($sha.ComputeHash($output))
+        if($have -ne $want){throw "R19 bridge verification failed: $($class.FullName)"}
+      }finally{$input.Dispose();$output.Dispose()}
     }}finally{$zip.Dispose();$sha.Dispose()}
     [IO.File]::Replace($patchTarget,$VelocityJar,[NullString]::Value)
     Write-Host '[Foundations Cluster] R19 guarded NeoForge capture/replay bridge installed and verified.'
-  }finally{if(Test-Path -LiteralPath $patchTarget){Remove-Item -LiteralPath $patchTarget -Force}}
+  }finally{
+    $bundle.Dispose()
+    if(Test-Path -LiteralPath $patchTarget){Remove-Item -LiteralPath $patchTarget -Force}
+  }
 }
 Install-FoundationsConduitR15Patch
 
@@ -435,42 +467,16 @@ if((Test-Path $GatewayPlugin) -and -not (Test-VelocityPluginJar $GatewayPlugin))
   Remove-Item -Force $GatewayPlugin -ErrorAction SilentlyContinue
 }
 
-$GatewayProject = Join-Path $Root "velocity-gateway"
-$GatewaySource = Join-Path $GatewayProject "source\FoundationsVelocityGateway.java"
-$GatewayMetadata = Join-Path $GatewayProject "resources\velocity-plugin.json"
-if(!(Test-Path $GatewaySource)){
-  throw "Foundations Velocity Gateway source is missing: $GatewaySource. Re-extract the R13 updater payload; the short source path is required."
-}
-if(!(Test-Path $GatewayMetadata)){
-  throw "Foundations Velocity Gateway metadata is missing: $GatewayMetadata. Re-extract the R13 updater payload."
-}
-
-# Release packages already include the compiled adapter. Use it before trying Gradle.
-$BundledPlugin = Join-Path $GatewayProject "build\libs\foundations_velocity_gateway-$GatewayVersion.jar"
-if (!(Test-Path -LiteralPath $GatewayPlugin) -and (Test-VelocityPluginJar $BundledPlugin)) {
-  Copy-Item -LiteralPath $BundledPlugin -Destination $GatewayPlugin -Force
+# HF13 updaters include the compiled adapter; source startup builds it above.
+if ((Test-VelocityPluginJar $BundledPlugin) -and (!(Test-VelocityPluginJar $GatewayPlugin) -or (Get-FileHash -LiteralPath $BundledPlugin).Hash -ne (Get-FileHash -LiteralPath $GatewayPlugin).Hash)) {
+  $pluginStage=$GatewayPlugin+'.staging'
+  try {
+    Copy-Item -LiteralPath $BundledPlugin -Destination $pluginStage -Force
+    if(Test-Path -LiteralPath $GatewayPlugin){[IO.File]::Replace($pluginStage,$GatewayPlugin,[NullString]::Value)}else{[IO.File]::Move($pluginStage,$GatewayPlugin)}
+  } finally {if(Test-Path -LiteralPath $pluginStage){Remove-Item -LiteralPath $pluginStage -Force}}
   Write-Host "[Foundations Cluster] Installed bundled Foundations Gateway $GatewayVersion."
 }
 
-if (!(Test-Path $GatewayPlugin)) {
-  Write-Host "[Foundations Cluster] Building Foundations Velocity Gateway plugin..."
-  $GradleOutput = @(& powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root "tools\ensure_gradle.ps1") -Quiet)
-  if($LASTEXITCODE -ne 0){ throw "Gradle bootstrap failed while preparing the Foundations Velocity plugin." }
-  $Gradle = ($GradleOutput | Where-Object { $_ -and ([string]$_).Trim().ToLowerInvariant().EndsWith("\gradle.bat") } | Select-Object -Last 1)
-  if($Gradle){ $Gradle = ([string]$Gradle).Trim() }
-  if(-not $Gradle -or !(Test-Path $Gradle)){ throw "Gradle bootstrap did not return a usable gradle.bat path." }
-  Push-Location $GatewayProject
-  try {
-    & $Gradle --no-daemon clean jar
-    if($LASTEXITCODE -ne 0){ throw "Foundations Velocity plugin build failed." }
-    $built=Get-ChildItem "build\libs\foundations_velocity_gateway-*.jar" | Select-Object -First 1
-    if(-not $built){ throw "Foundations Velocity plugin JAR was not produced." }
-    if(-not (Test-VelocityPluginJar $built.FullName)){
-      throw "Foundations Velocity plugin build produced an invalid JAR (missing velocity-plugin.json and/or plugin class). Check that compileJava is not NO-SOURCE."
-    }
-    Copy-Item -Force $built.FullName $GatewayPlugin
-  } finally { Pop-Location }
-}
 if(-not (Test-VelocityPluginJar $GatewayPlugin)){
   throw "Foundations Velocity plugin validation failed after installation: $GatewayPlugin"
 }

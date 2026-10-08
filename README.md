@@ -1,8 +1,10 @@
-# Foundations Cluster — 0.0.6a.R19-HF12 / Node R13
+# Foundations Cluster — 0.0.6a.R19-HF13 / Node R13
 
-HF12 hardens administrator security, journal recovery, replica invalidation and
-updater safety. It is a **pre-release control-plane hotfix** for an existing HF11
-installation. Node R13 and Gateway R19/Conduit are unchanged.
+HF13 repairs missing R19 gateway bridge classes after source extraction. The
+updater includes compiled gateway artifacts; fresh source startup builds them
+with an isolated JDK 25. It includes HF12 security and recovery hardening and
+accepts existing HF11/HF12/HF13 installations. Node R13 and the R19 protocol are
+unchanged. This is a **pre-release**.
 
 - **Install updates:** download the `FoundationsCluster-…-UPDATER.zip` asset from
   [GitHub Releases](https://github.com/Shnewbs/Foundations-Cluster-Software/releases).
@@ -17,7 +19,7 @@ installation. Node R13 and Gateway R19/Conduit are unchanged.
   publishing a new, uniquely versioned pre-release updater. Existing release assets
   are never replaced by a later source push with the same version.
 
-Read [HF12 changes and compatibility](release_notes/0.0.6a.R19-HF12.md) and the
+Read [HF13 changes and compatibility](release_notes/0.0.6a.R19-HF13.md) and the
 [audit and remaining production gates](docs/audits/2026-10-05-hardening.md).
 The HF11 validation record remains in `docs/R19_HF11_NATURAL_GROWTH_VALIDATION.md`.
 The historical HF9 installer is retired; do not run it against current installs.

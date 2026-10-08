@@ -1,3 +1,9 @@
+HF13 (2026-10-08): source startup now builds all four Java sources together.
+The updater carries velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar;
+setup validates and installs every bundled class from it. Loose .class files are
+no longer required. Build on Windows with tools/build_gateway.ps1 -JavaHome <JDK25>
+against velocity/velocity.jar (Conduit 1.8.0). Existing protocol behavior is unchanged.
+
 R19-HF6 (2026-09-28 UTC): normalize NeoForge data-map declaration order,
 enum class-entry order and feature-flag sets using the pinned 21.1.250 codecs.
 Retain mandatory flags and all ordered enum member data. Ship the new
