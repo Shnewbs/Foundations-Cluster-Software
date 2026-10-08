@@ -9,7 +9,7 @@ Manager and Minecraft workers remain on Java 21.
 1. Stop Manager, gateway and every worker. Keep your normal off-machine backup.
 2. Extract this entire ZIP into a separate folder, such as Downloads.
 3. Run APPLY_UPDATE.bat and enter the existing Cluster installation folder:
-   C:\Users\ProArt\Desktop\Foundations-Cluster-Software-main
+   C:\Your\Foundations-Cluster-Software-main
 4. Start Cluster normally. Gateway setup applies and verifies the bundled bridge.
 
 No full source download or manual Java installation is needed for this update.
