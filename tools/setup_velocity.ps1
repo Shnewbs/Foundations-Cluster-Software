@@ -103,6 +103,13 @@ function Test-Java25([string]$Path) {
   return ((Get-JavaMajor $Path) -ge 25)
 }
 
+function Get-GatewayFileHash([string]$Path) {
+  $sha=[Security.Cryptography.SHA256]::Create()
+  $stream=[IO.File]::OpenRead($Path)
+  try { return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant() }
+  finally {$stream.Dispose();$sha.Dispose()}
+}
+
 function Install-GatewayJava25([switch]$RequireCompiler) {
   if((Test-Java25 $GatewayJavaExe) -and (!$RequireCompiler -or ((Test-Path -LiteralPath (Join-Path $GatewayJavaHome "bin/javac.exe")) -and (Test-Path -LiteralPath (Join-Path $GatewayJavaHome "bin/jar.exe"))))){
     Write-Host "[Foundations Cluster] Gateway Java 25 validated."
@@ -136,7 +143,7 @@ function Install-GatewayJava25([switch]$RequireCompiler) {
     Write-Host "[Foundations Cluster] Downloading $($pkg.name)..."
     Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $pkg.link -OutFile $tmpZip -TimeoutSec 300
     if($pkg.checksum){
-      $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $tmpZip).Hash.ToLowerInvariant()
+      $actual=Get-GatewayFileHash $tmpZip
       $expected=([string]$pkg.checksum).ToLowerInvariant()
       if($actual -ne $expected){ throw "Java 25 download checksum mismatch." }
     }
@@ -468,7 +475,7 @@ if((Test-Path $GatewayPlugin) -and -not (Test-VelocityPluginJar $GatewayPlugin))
 }
 
 # HF13 updaters include the compiled adapter; source startup builds it above.
-if ((Test-VelocityPluginJar $BundledPlugin) -and (!(Test-VelocityPluginJar $GatewayPlugin) -or (Get-FileHash -LiteralPath $BundledPlugin).Hash -ne (Get-FileHash -LiteralPath $GatewayPlugin).Hash)) {
+if ((Test-VelocityPluginJar $BundledPlugin) -and (!(Test-VelocityPluginJar $GatewayPlugin) -or (Get-GatewayFileHash $BundledPlugin) -ne (Get-GatewayFileHash $GatewayPlugin))) {
   $pluginStage=$GatewayPlugin+'.staging'
   try {
     Copy-Item -LiteralPath $BundledPlugin -Destination $pluginStage -Force
