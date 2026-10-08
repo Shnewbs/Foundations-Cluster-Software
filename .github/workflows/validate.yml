@@ -92,5 +92,5 @@ jobs:
           if gh release view "v$version" >/dev/null 2>&1; then
             echo "Release v$version already exists; immutable assets left unchanged."
           else
-            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — gateway bootstrap repair" --notes-file "release_notes/$version.md"
+            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Test Lab fixture repair" --notes-file "release_notes/$version.md"
           fi

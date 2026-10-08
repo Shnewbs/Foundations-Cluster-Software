@@ -3,7 +3,8 @@ const app=fs.readFileSync(path.join(__dirname,'../web/app.js'),'utf8');
 const code=app.slice(app.indexOf('async function requireLivePair('),app.indexOf('async function gracefulStopTest('));
 let checks=0;
 function setup(options={}){
- let time=0,marker='',owner='worker-001',response='',created=false,transfers=0,polls=0;
+ let time=0,marker='',owner='worker-001',response='',created=false,transfers=0,polls=0,treeY=null,treeCleared=false;
+ const probes=new Map();
  const commands=[],lines=[],tickets=new Set(options.preloaded||[]),states=new Map();
  class Clock extends Date{static now(){return time;}}
  const context={Date:Clock,Math,console,jsonOpts:(method,body)=>({method,body:JSON.stringify(body)}),testSleep:async(ms)=>{time+=ms;},testLine:s=>lines.push(s)};
@@ -28,9 +29,23 @@ function setup(options={}){
     if(options.missingChest&&transfers===1){response='The target block is not a block entity';return {};}
     response=`8, 300, 8 has the following block data: [{count: ${options.wrongCount&&transfers===1?16:states.get(target)}, Slot: 0b, id: "minecraft:diamond"}]`;
    }else if(command.includes('if data block'))response=!(options.wrongCount&&transfers===1)&&states.get(target)===17?command.slice(command.indexOf('run say ')+8):'';
-   else if(command.includes('foundations_region_probe'))response=`FOUNDATIONS_REGION_PROBE sha256=${(options.treeMismatch&&transfers===1?'b':'a').repeat(64)} blocks=${created?35:options.occupied?1:0} logs=${created?5:0} leaves=${created?29:0}`;
-   else if(command.includes('setblock 8 282 8')){created=true;response='Changed the block at 8, 282, 8';}
-   else if(command.includes('place feature'))response='Placed "minecraft:oak" at 8, 283, 8';
+   else if(command.includes('foundations_region_probe')){
+    const coords=command.match(/foundations_region_probe 0 (-?\d+) 0 15 (-?\d+) 15/);
+    assert.ok(coords,'Invalid probe volume');const floor=Number(coords[1]);assert.equal(Number(coords[2])-floor,23);
+    const count=(probes.get(floor)||0)+1;probes.set(floor,count);
+    const treeHere=treeY===floor&&!treeCleared;
+    const occupied=options.occupied||(options.occupiedFloors||[]).includes(floor)||(options.occupiedOnRecheck&&count>1&&treeY===null);
+    response='FOUNDATIONS_REGION_PROBE sha256='+((options.treeMismatch&&transfers===1?'b':'a').repeat(64))+
+      ' blocks='+(treeHere?35:occupied?1:0)+' logs='+(treeHere?5:0)+' leaves='+(treeHere?29:0);
+   }else if(/setblock 8 \d+ 8 minecraft:dirt keep/.test(command)){
+    treeY=Number(command.match(/setblock 8 (\d+)/)[1])-2;treeCleared=false;created=true;response='Changed the block at 8, '+(treeY+2)+', 8';
+   }else if(command.includes('place feature')){
+    assert.ok(command.endsWith('minecraft:oak 8 '+(treeY+3)+' 8'),'Tree placed outside selected volume');
+    response='Placed "minecraft:oak" at 8, '+(treeY+3)+', 8';
+   }else if(command.includes('run fill ')){
+    assert.ok(command.endsWith('fill 0 '+treeY+' 0 15 '+(treeY+23)+' 15 minecraft:air replace'),'Cleanup targeted the wrong area');
+    if(!options.cleanupFailure)treeCleared=true;response='cleanup requested';
+   }
    else response='cleanup';
    return {};
   }
@@ -57,9 +72,31 @@ function setup(options={}){
  c=setup({recovering:true});await c.context.moveRegion('foundations/minecraft:overworld/r.0.0','worker-001');assert.equal(c.transfers(),0);checks++;
  c=setup();assert.match(await c.context.growthTest('worker-001','worker-002'),/all 6144 block states matched/);checks++;
  assert.equal(c.transfers(),2);checks++;assert.equal(c.commands.filter(([,cmd])=>cmd.includes('fill 0 280 0')).length,1);checks++;
- c=setup({occupied:true});await assert.rejects(()=>c.context.growthTest('worker-001','worker-002'),/occupied; nothing was replaced/);checks++;
+ c=setup({occupied:true});await assert.rejects(()=>c.context.growthTest('worker-001','worker-002'),/No empty.*Occupied blocks were preserved/);checks++;
  assert.ok(!c.commands.some(([,cmd])=>/run (setblock|fill|place)/.test(cmd)));checks++;
  c=setup({treeMismatch:true});await assert.rejects(()=>c.context.growthTest('worker-001','worker-002'),/verify destination tree.*Tree block states differ/);checks++;
  assert.equal(c.transfers(),1);checks++;
+ assert.ok(!c.commands.some(([,cmd])=>cmd.includes('run fill ')));checks++;
+ c=setup({occupiedFloors:[280],preloaded:['worker-002']});
+ assert.match(await c.context.growthTest('worker-001','worker-002'),/at 0 296 0 15 319 15/);checks++;
+ assert.ok(c.commands.some(([,cmd])=>cmd.includes('setblock 8 298 8 minecraft:dirt keep')));checks++;
+ assert.ok(!c.commands.some(([,cmd])=>cmd.includes('fill 0 280 0')));checks++;
+ assert.deepEqual([...c.tickets],['worker-002']);checks++;
+ c=setup({occupiedFloors:[280,296]});
+ assert.match(await c.context.growthTest('worker-001','worker-002'),/at 0 256 0 15 279 15/);checks++;
+ assert.ok(c.lines.some(line=>line.includes('Tree fixture selected: 0 256 0 15 279 15')));checks++;
+ c=setup({occupied:true});
+ await assert.rejects(()=>c.context.growthTest('worker-001','worker-002'),/No empty/);checks++;
+ assert.equal(c.commands.filter(([,cmd])=>cmd.includes('foundations_region_probe')).length,7);checks++;
+ assert.equal(c.tickets.size,0);checks++;
+ c=setup({occupiedOnRecheck:true});
+ await assert.rejects(()=>c.context.growthTest('worker-001','worker-002'),/became occupied; nothing was replaced/);checks++;
+ assert.ok(!c.commands.some(([,cmd])=>/run (setblock|fill|place)/.test(cmd)));checks++;
+ c=setup({cleanupFailure:true});
+ await assert.rejects(()=>c.context.growthTest('worker-001','worker-002'),/clean up tree fixture.*removal was not confirmed/);checks++;
+ assert.equal(c.tickets.size,0);checks++;
+ c=setup();await c.context.growthTest('worker-001','worker-002');await c.context.growthTest('worker-001','worker-002');
+ assert.equal(c.commands.filter(([,cmd])=>cmd.includes('run fill ')).length,2);checks++;
+ assert.equal(c.tickets.size,0);checks++;
  console.log(`Test Lab persistence: PASS (${checks} cases)`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

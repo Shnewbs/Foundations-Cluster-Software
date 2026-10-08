@@ -512,28 +512,64 @@ async function chestTest(source,dest){
   }catch(e){throw new Error(`${stage} — ${e.message}`);}
   finally{await cleanupPersistenceFixture(fixture,'setblock 8 300 8 air replace');}
 }
-async function growthSnapshot(worker){
-  const out=await consoleWait(worker,'execute in minecraft:overworld run foundations_region_probe 0 280 0 15 303 15','FOUNDATIONS_REGION_PROBE');
+const growthFixtureFloors=[280,296,256,232,208,184,160];
+function growthVolume(minY){return {minY,maxY:minY+23};}
+function growthBounds(volume){return '0 '+volume.minY+' 0 15 '+volume.maxY+' 15';}
+async function growthSnapshot(worker,volume=growthVolume(280)){
+  const out=await consoleWait(worker,'execute in minecraft:overworld run foundations_region_probe '+growthBounds(volume),'FOUNDATIONS_REGION_PROBE');
   const match=out.match(/FOUNDATIONS_REGION_PROBE sha256=([a-f0-9]{64}) blocks=(\d+) logs=(\d+) leaves=(\d+)/);
-  if(!match)throw new Error(`${worker}: incomplete growth probe response`);
+  if(!match)throw new Error(worker+': incomplete growth probe response');
   return {hash:match[1],blocks:Number(match[2]),logs:Number(match[3]),leaves:Number(match[4])};
 }
+async function selectGrowthVolume(worker){
+  for(const minY of growthFixtureFloors){
+    const volume=growthVolume(minY);
+    if((await growthSnapshot(worker,volume)).blocks===0)return volume;
+    testLine('INFO  Tree fixture area '+growthBounds(volume)+' is occupied; checking the next area.');
+  }
+  throw new Error('No empty 16x24x16 tree fixture area in chunk 0,0 at Y='+growthFixtureFloors.join(', ')+'. Occupied blocks were preserved; no tree was placed.');
+}
+async function cleanupGrowthFixture(fixture,volume){
+  if(!fixture)return;
+  try{
+    if(fixture.created&&volume){
+      const owner=(await api('/api/regions')).regions?.find(r=>r.id===fixture.region&&r.state==='ACTIVE')?.ownerWorkerId;
+      if(!owner)throw new Error('no ACTIVE owner; temporary tree retained');
+      // Retain the area when its observed hash differs after a failed transfer or edit.
+      const current=await growthSnapshot(owner,volume);
+      if(current.blocks!==0){
+        if(!fixture.treeHash||current.hash!==fixture.treeHash)throw new Error('tree area changed; blocks retained at '+growthBounds(volume));
+        await api('/api/console/execute',jsonOpts('POST',{target:owner,command:'execute in minecraft:overworld run fill '+growthBounds(volume)+' minecraft:air replace'}));
+        const end=Date.now()+8000;let cleared=false;
+        while(Date.now()<end){if((await growthSnapshot(owner,volume)).blocks===0){cleared=true;break;}await testSleep(250);}
+        if(!cleared)throw new Error('tree removal was not confirmed at '+growthBounds(volume));
+      }
+    }
+  }finally{await cleanupPersistenceFixture(fixture);}
+}
 async function growthTest(source,dest){
-  let fixture,stage='prepare tree fixture';
+  let fixture,volume,stage='prepare tree fixture',failure,result;
   try{
     fixture=await preparePersistenceFixture(source,dest);({source,dest}=fixture);
-    if((await growthSnapshot(source)).blocks!==0)throw new Error('Tree test volume 0,280,0 through 15,303,15 is occupied; nothing was replaced');
+    volume=await selectGrowthVolume(source);
+    testLine('INFO  Tree fixture selected: '+growthBounds(volume)+' on '+source+'.');
     stage='generate tree on source';
-    await consoleWait(source,'execute in minecraft:overworld run setblock 8 282 8 minecraft:dirt keep','Changed the block at');fixture.created=true;
-    await consoleWait(source,'execute in minecraft:overworld run place feature minecraft:oak 8 283 8','Placed "minecraft:oak"');
-    await testSleep(1500);const before=await growthSnapshot(source);if(!before.logs||!before.leaves)throw new Error('Fixture did not generate both logs and leaves');
-    stage='verify destination tree';await moveRegion(fixture.region,dest);const mid=await growthSnapshot(dest);
-    if(before.hash!==mid.hash)throw new Error(`Tree block states differ: source=${before.hash} destination=${mid.hash}`);
-    stage='verify returned tree';await moveRegion(fixture.region,source);const after=await growthSnapshot(source);
-    if(before.hash!==after.hash)throw new Error(`Tree block states differ on return: source=${before.hash} returned=${after.hash}`);
-    return `Generated oak: ${before.logs} logs, ${before.leaves} leaves; all 6144 block states matched across authority round-trip`;
-  }catch(e){throw new Error(`${stage} — ${e.message}`);}
-  finally{await cleanupPersistenceFixture(fixture,'fill 0 280 0 15 303 15 minecraft:air replace');}
+    // Recheck the whole volume immediately before requesting the feature.
+    if((await growthSnapshot(source,volume)).blocks!==0)throw new Error('Selected tree area became occupied; nothing was replaced');
+    await consoleWait(source,'execute in minecraft:overworld run setblock 8 '+(volume.minY+2)+' 8 minecraft:dirt keep','Changed the block at');fixture.created=true;
+    await consoleWait(source,'execute in minecraft:overworld run place feature minecraft:oak 8 '+(volume.minY+3)+' 8','Placed "minecraft:oak"');
+    await testSleep(1500);const before=await growthSnapshot(source,volume);if(!before.logs||!before.leaves)throw new Error('Fixture did not generate both logs and leaves');
+    fixture.treeHash=before.hash;
+    stage='verify destination tree';await moveRegion(fixture.region,dest);const mid=await growthSnapshot(dest,volume);
+    if(before.hash!==mid.hash)throw new Error('Tree block states differ: source='+before.hash+' destination='+mid.hash);
+    stage='verify returned tree';await moveRegion(fixture.region,source);const after=await growthSnapshot(source,volume);
+    if(before.hash!==after.hash)throw new Error('Tree block states differ on return: source='+before.hash+' returned='+after.hash);
+    result='Generated oak: '+before.logs+' logs, '+before.leaves+' leaves; all 6144 block states matched across authority round-trip at '+growthBounds(volume);
+  }catch(e){failure=new Error(stage+' — '+e.message);}
+  try{await cleanupGrowthFixture(fixture,volume);}
+  catch(e){testLine('WARN  Tree fixture cleanup: '+e.message);if(!failure)failure=new Error('clean up tree fixture — '+e.message);}
+  if(failure)throw failure;
+  return result;
 }
 async function gracefulStopTest(worker,timeout=90000){const ws=(await api('/api/workers')).workers||[];const live=ws.filter(w=>['READY','ACTIVE'].includes(w.state));const target=live.find(w=>w.id===worker&&w.managerControlled===true);if(!target)throw new Error(`${worker} is not Manager-controlled/live`);if(live.length<2)throw new Error('Need at least two live workers');const players=Number(target.players||0);await api(`/api/workers/${encodeURIComponent(worker)}/stop`,{method:'POST'});const end=Date.now()+timeout;while(Date.now()<end){await testSleep(1000);const now=(await api('/api/workers')).workers?.find(w=>w.id===worker);if(now&&!now.processAlive&&Number(now.players||0)===0)return `evacuatedPlayers=${players}; state=${now.state}`;}throw new Error(`${worker} did not stop within ${timeout/1000}s`);}
 async function restartWorkerTest(worker,timeout=90000){
@@ -554,7 +590,7 @@ if($('testSafeBtn'))$('testSafeBtn').onclick=()=>runWebTests(false);
 if($('testFullBtn'))$('testFullBtn').onclick=()=>runWebTests(true);
 if($('testHandoffBtn'))$('testHandoffBtn').onclick=()=>runSingleWebTest('Physical Backend Handoff','player',null,({player,dest})=>handoffTest(player,dest));
 if($('testChestBtn'))$('testChestBtn').onclick=()=>runSingleWebTest('Chest / BlockEntity Transfer','pair',()=> 'Run temporary chest/BlockEntity authority-transfer test?',({source,dest})=>chestTest(source,dest));
-if($('testGrowthBtn'))$('testGrowthBtn').onclick=()=>runSingleWebTest('Generated Tree Persistence','pair',()=> 'Generate a temporary oak in empty space at 0,280,0 through 15,303,15 and verify its blocks across an authority round-trip?',({source,dest})=>growthTest(source,dest));
+if($('testGrowthBtn'))$('testGrowthBtn').onclick=()=>runSingleWebTest('Generated Tree Persistence','pair',()=> 'Find an empty 16x24x16 area in spawn chunk 0,0 (Y 160-319), generate a temporary oak there, verify its blocks across an authority round-trip, then remove the fixture? Occupied areas are skipped.',({source,dest})=>growthTest(source,dest));
 if($('testStopBtn'))$('testStopBtn').onclick=()=>runSingleWebTest('Graceful Stop + Restore','source',({source})=>`Gracefully stop/evacuate ${source}, verify it reaches OFFLINE, then restore it?`,async({source})=>{const stopped=await gracefulStopTest(source);testLine('INFO  '+stopped);return await restartWorkerTest(source);});
 
 

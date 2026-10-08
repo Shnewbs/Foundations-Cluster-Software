@@ -1,10 +1,10 @@
-# Foundations Cluster — 0.0.6a.R19-HF13 / Node R13
+# Foundations Cluster — 0.0.6a.R19-HF14 / Node R13
 
-HF13 repairs missing R19 gateway bridge classes after source extraction. The
-updater includes compiled gateway artifacts; fresh source startup builds them
-with an isolated JDK 25. It includes HF12 security and recovery hardening and
-accepts existing HF11/HF12/HF13 installations. Node R13 and the R19 protocol are
-unchanged. This is a **pre-release**.
+HF14 repairs Test Lab tree-fixture placement by selecting an empty area instead
+of failing immediately when the original area is occupied. It verifies cleanup
+and includes HF12 security/recovery hardening and HF13 gateway binaries.
+Accepts existing HF11/HF12/HF13/HF14 installations. Node R13 and the R19 protocol
+are unchanged. This is a **pre-release**.
 
 - **Install updates:** download the `FoundationsCluster-…-UPDATER.zip` asset from
   [GitHub Releases](https://github.com/Shnewbs/Foundations-Cluster-Software/releases).
@@ -19,7 +19,7 @@ unchanged. This is a **pre-release**.
   publishing a new, uniquely versioned pre-release updater. Existing release assets
   are never replaced by a later source push with the same version.
 
-Read [HF13 changes and compatibility](release_notes/0.0.6a.R19-HF13.md) and the
+Read [HF14 changes and compatibility](release_notes/0.0.6a.R19-HF14.md) and the
 [audit and remaining production gates](docs/audits/2026-10-05-hardening.md).
 The HF11 validation record remains in `docs/R19_HF11_NATURAL_GROWTH_VALIDATION.md`.
 The historical HF9 installer is retired; do not run it against current installs.

@@ -38,7 +38,7 @@ try:
  check(not state['lastError'] and len(state['archives'])==1,'Capture listed without errors')
  status,data=req('/api/support/download?name='+state['lastCreated'],raw=True);check(status==200,'ZIP downloaded')
  with zipfile.ZipFile(io.BytesIO(data)) as z:
-  manifest=json.loads(z.read('manifest.json'));check(manifest['package']=='0.0.6a.R19-HF13','Archive identifies hotfix')
+  manifest=json.loads(z.read('manifest.json'));check(manifest['package']=='0.0.6a.R19-HF14','Archive identifies hotfix')
   check(b'Support regression marker' in z.read('logs/fixture.log') and b'fixture-must-be-redacted' not in z.read('logs/fixture.log'),'Logs included and credential label redacted')
   check(b'FAIL region RECOVERING' in z.read('test-report.txt'),'Failure report included')
   check(all(not n.startswith(('runtime/security','config/','workers/')) for n in z.namelist()),'Excluded files absent from real export')
