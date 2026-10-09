@@ -40,10 +40,13 @@ expected = sum(len(re.findall(r'@GameTest\(', p.read_text())) for p in (ROOT/'mi
 if not expected or not re.search(rf'All {expected} required tests passed', text):
     raise SystemExit('Game test pass/count evidence missing; refusing to package')
 version = re.search(r'^mod_version=(.+)$', (ROOT/'minecraft-agent/gradle.properties').read_text(), re.M).group(1)
+generated = ROOT / 'minecraft-agent/build/generated/sources/nodeVersion/java/com/foundations/cluster/node/FoundationsClusterNode.java'
+assert f'public static final String VERSION = "{version}";' in generated.read_text(encoding='utf-8'), 'Generated Node source version mismatch'
 jar = ROOT/f'minecraft-agent/build/libs/foundations_cluster_node-{version}.jar'
 with zipfile.ZipFile(jar) as z:
     assert f'version="{version}"' in z.read('META-INF/neoforge.mods.toml').decode()
     assert z.read('com/foundations/cluster/node/interaction/AuthorityBreakExecutor.class')[:8] == bytes.fromhex('cafebabe00000041')
+    assert z.read('com/foundations/cluster/playtest/FoundationsPlaytest.class')[:8] == bytes.fromhex('cafebabe00000041')
     assert not any('/spike/' in n or 'foundations_cluster_spike' in n for n in z.namelist()), 'Test fixtures leaked into runtime Node'
 # Exercise Manager upgrade selection with the actual tested JAR, not a metadata fixture.
 classpath = os.pathsep.join(str(ROOT/p) for p in [

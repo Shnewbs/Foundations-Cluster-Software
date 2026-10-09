@@ -1,65 +1,29 @@
-# Foundations Cluster — 0.0.6a.R19-HF16 / Node R14
+# Foundations Cluster — 0.0.7a-dev.2 / Node R15
 
-HF16 adds separated top-bar **Restart Servers** and **Shutdown Cluster** controls,
-full-row worker details, and adjacent **Restart / Stop / Kill** actions on the
-Dashboard and Workers pages. It includes the merged player-ledger recovery work
-and the Manager support-archive retention race fix. This is a **pre-release**.
+Installable development update after HF16: opt-in connected-player observations,
+read-only player .dat inventory comparisons, local report summaries and real
+scheduled-tick codec/time-skew tests. Manager API and gateway stay at R19.
 
-**Remote Survival breaking and placement remain disabled.** Recovery protocol
-experiments do not imply completed Minecraft inventory/chunk/entity integration.
-Manager API and gateway stay at R19; the updater includes Node R14.
+**Remote Survival breaking/placement remain disabled. This is not completed 7a.**
+The dev.1 inventory journals/adapters remain groundwork; this release does not
+install them as the live inventory authority or restore player saves.
 
-## Install
+Download the versioned UPDATER asset, stop the entire cluster, extract separately
+and run APPLY_UPDATE.bat. Test on a stopped backup/copy. Confirm Node R15 on every
+worker. Existing HF16 shutdown/restart controls, row navigation and Stop/Kill remain.
 
-Download `FoundationsCluster-0.0.6a.R19-HF16-UPDATER.zip` from
-[GitHub Releases](https://github.com/Shnewbs/Foundations-Cluster-Software/releases).
-Stop Manager, gateway and all workers. Extract the updater separately and run
-`APPLY_UPDATE.bat`, selecting your existing Cluster folder. Restart normally and
-refresh the dashboard with **Ctrl+F5**.
+[Install and live test guide](docs/PLAYTEST_DEV2_GUIDE.md)
+[Changes, evidence scope and remaining gates](docs/status/0_0_7A_DEVELOPMENT_2.md)
 
-HF11 through HF16 installations are accepted. Worlds, profiles, credentials,
-active configuration and runtime journals are excluded from the updater payload.
-Keep the updater and its matching printed backup path for rollback. Later
-Node/template synchronization and gateway runtime patches have separate backups.
+Start with `/foundations_playtest start control first_test` as a connected operator.
+Recording is off otherwise. `mark`, `status`, `check-save`, and `stop` are read-only
+with respect to game/player state. Reports remain under the active world's
+`foundations-playtest` directory and are never uploaded automatically.
 
-## Control scopes
+Build with Java 21, Python 3.12 and Node 22: `python tools/validate.py`, then
+`python tools/validate_survival_spike.py`. Windows CI also validates gateway builds
+and updater apply/rollback. Source and evidence are included in TEST-TOOLS assets.
+Development publication is gated on both platforms; existing releases are not replaced.
 
-| Control | Behavior |
-| --- | --- |
-| Restart Servers | Graceful rolling restart of managed Minecraft workers; Manager and gateway remain online. |
-| Shutdown Cluster | Exit Manager/dashboard, close its owned gateway and request shutdown of managed workers. External processes are not terminated. |
-| Worker Restart | Evacuate players/authority, stop and relaunch that worker. |
-| Worker Stop | Graceful evacuation-aware stop without relaunch by that action. |
-| Worker Kill | Emergency process termination with a warning; unsaved world changes may be lost. |
-
-Click a non-interactive cell in either worker table to open its details; Enter and
-Space work on focused rows. Buttons remain independent of row navigation. Stale,
-external, unavailable or already-submitting actions are disabled. A blocked
-evacuation can abort a graceful stop or restart; Kill bypasses that protection.
-
-## Development and validation
-
-Source remains on `main`. Run `python tools/validate.py` with a full JDK 21,
-Python 3.12 and Node 22. Run `python tools/validate_survival_spike.py` for the real
-NeoForge fixture tests. The Windows launcher initializes active configuration
-from `config/cluster.properties.default`; direct Java launches require that copy.
-Application binaries belong in release assets, not source commits.
-
-CI validates Windows and Linux, including source paths containing spaces. The
-Windows pipeline also builds the gateway and tests updater apply/rollback.
-A uniquely versioned pre-release is published only after both platforms pass;
-existing release assets are never overwritten by a same-version source push.
-The 48 new control-logic checks use inert API/DOM fixtures. The 36 locally run
-Chromium checks use production UI assets with simulated worker responses, not
-live Minecraft process controls.
-
-Read [HF16 changes and compatibility](release_notes/0.0.6a.R19-HF16.md),
-[recovery evidence](docs/status/WORLD_REPLICATION_V2_2_LEDGER_RECOVERY_2026-10-09.md),
-[Spike A/C and remaining gates](docs/status/WORLD_REPLICATION_V2_2_SPIKE_A_C_2026-10-09.md),
-and the [hardening audit](docs/audits/2026-10-05-hardening.md).
-
-The frozen World Replication v2.2 design is in `docs/frozen_design/`; its source
-handoff roadmap is `docs/status/CURRENT_STATUS_AND_ROADMAP_2026-09-29.md`.
-The previous README is preserved verbatim as [historical context](docs/history/README_HF15.md)
-(relative links in that historical copy refer to the repository root). Its old
-installation/version claims are superseded here. The HF9 installer is retired.
+Frozen World Replication v2.2 design: `docs/frozen_design/` (unchanged).
+Previous HF16 instructions: [historical README](docs/history/README_HF16.md).

@@ -24,7 +24,7 @@ def run(*cmd):
 def compile_to(destination, sources, cp=None):
     destination = ROOT / destination
     shutil.rmtree(destination, ignore_errors=True)
-    destination.mkdir(parents=True)
+    destination.mkdir(parents=True, exist_ok=True)
     argfile = destination.parent / (destination.name + '-sources.txt')
     argfile.write_text('\n'.join('"' + str(s.resolve()).replace('\\', '/') + '"' for s in sorted(sources)), encoding='utf-8')
     compiler = [a.java, '-jar', a.ecj, '-21', '-nowarn'] if a.ecj else [a.javac, '--release', '21']
@@ -65,4 +65,7 @@ for test in sorted((ROOT / 'tests').glob('testlab_*_test.cjs')):
 if not a.skip_http:
     for name in ['hydration_api_test.py', 'support_api_test.py', 'restart_api_test.py', 'security_api_test.py']:
         run(sys.executable, ROOT / 'tests' / name, '--java', a.java)
+playtest = compile_to('playtest/build/test-classes', [ROOT / 'minecraft-agent/src/main/java/com/foundations/cluster/playtest/PlaytestTrace.java', ROOT / 'tests/PlaytestTraceSelfTest.java'])
+run(a.java, '-cp', playtest, 'com.foundations.cluster.playtest.PlaytestTraceSelfTest')
+run(sys.executable, ROOT / 'tests/playtest_report_test.py')
 print('Portable validation PASS. Live NeoForge/Conduit acceptance is a separate gate.', flush=True)

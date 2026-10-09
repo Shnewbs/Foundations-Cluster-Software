@@ -46,17 +46,17 @@ jobs:
           path: source with spaces/minecraft-agent/build/reports/survival-spike/*
           if-no-files-found: warn
           retention-days: 14
-      - name: Package and rerun development experiment JAR
+      - name: Package exact playtest tools and rerun trace JAR
         if: runner.os == 'Linux'
-        run: python tools/package_development.py
-      - name: Preserve development experiment bundle
+        run: python tools/package_playtest.py
+      - name: Preserve development playtest tools
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: survival-development
           path: |
-            source with spaces/development-dist/*-EXPERIMENTS.zip
-            source with spaces/development-dist/*-EXPERIMENTS.zip.sha256
+            source with spaces/development-dist/*-TEST-TOOLS.zip
+            source with spaces/development-dist/*-TEST-TOOLS.zip.sha256
           if-no-files-found: error
           retention-days: 14
       - name: Exercise Windows launch build scripts
@@ -115,7 +115,7 @@ jobs:
           if gh release view "v$version" >/dev/null 2>&1; then
             echo "Release v$version already exists; immutable assets left unchanged."
           else
-            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Worker controls and recovery" --notes-file "release_notes/$version.md"
+            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Live playtest and recovery groundwork" --notes-file "release_notes/$version.md"
           fi
   development-release:
     needs: regression
@@ -131,7 +131,11 @@ jobs:
         with:
           name: survival-development
           path: development-dist
-      - name: Publish clearly separated development experiments
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-updater
+          path: development-dist
+      - name: Publish installable development playtest after both platform gates
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -142,8 +146,8 @@ jobs:
             echo 'A newer development candidate exists; keep this run as evidence only.'
             exit 0
           fi
-          if gh release view v0.0.7a-dev.1 >/dev/null 2>&1; then
+          if gh release view v0.0.7a-dev.2 >/dev/null 2>&1; then
             echo 'Existing development release is immutable; assets not replaced.'
           else
-            gh release create v0.0.7a-dev.1 development-dist/* --target "$GITHUB_SHA" --prerelease --latest=false --title 'Foundations Cluster 0.0.7a-dev.1 — Inventory/save experiments, NOT playable 7a' --notes-file docs/status/0_0_7A_DEVELOPMENT_1.md
+            gh release create v0.0.7a-dev.2 development-dist/* --target "$GITHUB_SHA" --prerelease --latest=false --title 'Foundations Cluster 0.0.7a-dev.2 — Live playtest and player-save checks' --notes-file docs/status/0_0_7A_DEVELOPMENT_2.md
           fi

@@ -33,13 +33,15 @@ try {
     $original=(Get-FileHash $jar).Hash
     Run-Update
     $manifest=Get-Content (Join-Path $package 'UPDATE_MANIFEST.json') -Raw | ConvertFrom-Json
-    Check ($manifest.version -eq '0.0.6a.R19-HF16') 'Wrong release package'
+    Check ($manifest.version -eq '0.0.7a-dev.2') 'Wrong release package'
     foreach($item in $manifest.files){Check ((Get-FileHash (Join-Path $install $item.path)).Hash -eq $item.sha256) 'Installed hash mismatch'}
     foreach($path in @('web/operations.js','web/operations.css','web/worker-controls.js','web/worker-controls.css')){
         Check ($path -cin @($manifest.files.path)) 'Missing worker-controls payload'
     }
     foreach($pair in @(@('config/cluster.properties','operator config'),@('runtime/security/keep.key','fixture secret'),@('workers/worker-001/world/level.dat','fixture world'))){Check ((Get-Content (Join-Path $install $pair[0]) -Raw) -eq $pair[1]) 'Operator data changed'}
     $backup=(Get-ChildItem (Join-Path $install 'update-backups') -Directory | Select-Object -First 1).FullName
+    Run-Update # Reapplying the same development version is explicitly supported.
+    Check (!(Test-Path (Join-Path $install 'runtime/update-in-progress.json'))) 'Reinstall left an update marker'
     Run-Update -backup $backup
     Check ((Get-FileHash $jar).Hash -eq $original) 'Rollback did not restore Manager'
     Check ((Get-Content (Join-Path $install 'tools/start_foundations.ps1') -Raw) -eq 'previous launcher') 'Rollback did not restore launcher'
@@ -49,7 +51,7 @@ try {
     Check ((Get-Content (Join-Path $install 'web/index.html') -Raw) -eq 'previous page') 'Rollback did not restore page'
     Check ((Get-Content (Join-Path $install 'web/operations.js') -Raw) -eq 'previous workspace') 'Rollback did not restore workspace'
     Check ((Get-Content (Join-Path $install 'web/operations.css') -Raw) -eq 'previous workspace styles') 'Rollback did not restore workspace styles'
-    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg','web/features.json')){
+    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R15.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg','web/features.json')){
         Check (!(Test-Path -LiteralPath (Join-Path $install $path))) 'Rollback left a newly added application artifact'
     }
     $payload=Join-Path $package 'payload/cluster-manager/lib/bcprov.jar';$good=[IO.File]::ReadAllBytes($payload)

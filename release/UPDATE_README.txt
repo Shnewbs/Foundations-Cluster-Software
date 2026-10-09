@@ -1,36 +1,16 @@
-Foundations Cluster 0.0.6a.R19-HF16 / Node R14 (pre-release)
-Worker controls and recovery hardening
+Foundations Cluster 0.0.7a-dev.2 / Node 0.0.6a.R15
+INSTALLABLE DEVELOPMENT BUILD: live-player observations and read-only save checks.
+NOT completed two-worker Survival. Remote Survival edits remain disabled.
 
-INSTALL
-1. Stop Manager, gateway and every worker. Confirm the Java processes have exited.
-2. Extract this updater separately, not over the running installation.
-3. Run APPLY_UPDATE.bat and select the existing Cluster folder.
-4. Start Foundations normally, then refresh the dashboard with Ctrl+F5.
+Stop Manager, gateway and every worker. Extract separately and run APPLY_UPDATE.bat,
+selecting the existing stopped Cluster folder. Keep the printed backup path. Start
+normally and confirm Node R15 on every worker. No separate playtest mod is needed.
 
-Accepts HF11 through HF16. Includes the compiled Manager, R19 gateway artifacts,
-Node R14, and the complete dashboard script/style set. Manager installs the staged
-Node into its configured template and synchronizes stopped workers through the
-existing backup-preserving path. No Gradle download is needed for this updater.
+Supports HF11 through HF16 or dev.2. Existing config, worlds, credentials, profiles,
+player saves, journals and reports are excluded from the updater payload. Node
+synchronization and gateway runtime updates have their own later backups.
 
-CONTROLS
-Restart Servers: rolling restart of managed Minecraft workers only; Manager and
-gateway stay online. Shutdown Cluster: closes Manager and its owned gateway and
-requests shutdown of managed workers; external processes are not terminated.
-Click a worker row to open details. Restart, Stop and Kill are adjacent actions.
-Stop is graceful and evacuation-aware. Kill immediately terminates the process
-and may lose unsaved world changes; it is an emergency action with confirmation.
-
-DATA AND ROLLBACK
-Worlds, profiles, credentials, active configuration and runtime journals are not
-payload files. Existing application files are backed up before replacement.
-Keep this updater and the matching printed update-backups/HF16-... directory.
-Rollback with this updater's tools/apply_update.ps1 -ClusterRoot <installation>
--Rollback <matching backup path>. Older updater backups need their matching tools.
-Later Node/template synchronization and gateway runtime patches have separate
-backups. Never delete a world to resolve a Node version mismatch.
-
-LIMITS
-The recovery reference model is integrated in source, not connected to production
-Minecraft inventories. Remote Survival breaking and placement remain disabled.
-Browser tests use simulated workers; live-client and multi-worker acceptance
-remain separate. Read release_notes/0.0.6a.R19-HF16.md in the repository for scope.
+Open PLAYTEST_GUIDE.md for commands, expected results, reports and rollback.
+Commands: /foundations_playtest start control <label>, mark <label>, check-save,
+status and stop. Your connected operator must explicitly start every capture.
+Reports remain local; review before sharing. Diagnostics never restore inventories.

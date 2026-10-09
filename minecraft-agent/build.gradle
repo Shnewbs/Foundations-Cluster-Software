@@ -43,3 +43,26 @@ neoForge {
     runs.client.loadedMods = [mods[mod_id]]
 }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+// Generate the entrypoint version from the same property as the artifact metadata.
+// The retained source template is otherwise copied unchanged. This prevents stale
+// heartbeat versions from disagreeing with a correctly versioned deployment JAR.
+def generatedNodeSources = layout.buildDirectory.dir('generated/sources/nodeVersion/java')
+tasks.register('generateNodeSource') {
+    def template = layout.projectDirectory.file('src/main/templates/FoundationsClusterNode.java.template')
+    inputs.file(template)
+    inputs.property('nodeVersion', provider { mod_version.toString() })
+    outputs.dir(generatedNodeSources)
+    doLast {
+        def nodeVersion = mod_version.toString()
+        if (!(nodeVersion ==~ /[0-9A-Za-z._-]+/)) throw new GradleException('Invalid Node version')
+        def code = template.asFile.getText('UTF-8')
+        def declaration = /public static final String VERSION = "[^"]+";/
+        if ((code =~ declaration).count != 1) throw new GradleException('Node version template must have one declaration')
+        def destination = new File(generatedNodeSources.get().asFile, 'com/foundations/cluster/node/FoundationsClusterNode.java')
+        destination.parentFile.mkdirs()
+        destination.setText(code.replaceFirst(declaration, 'public static final String VERSION = "' + nodeVersion + '";'), 'UTF-8')
+    }
+}
+sourceSets.main.java.srcDir(generatedNodeSources)
+tasks.named('compileJava') { dependsOn tasks.named('generateNodeSource') }
