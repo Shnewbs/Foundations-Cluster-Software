@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -54,8 +55,27 @@ final class SupportArchives implements AutoCloseable {
         if(!p.startsWith(home))throw new IOException("Path outside Cluster");
         for(Path q=p;q!=null&&q.startsWith(home);q=q.getParent())if(Files.isSymbolicLink(q))throw new IOException("Symbolic links are excluded");
     }
+    /** Metadata is captured once so retention cannot invalidate sorting or JSON construction. */
+    record Archive(Path path,long bytes,long modified) {}
+    static List<Archive> inspectArchives(Collection<Path> candidates)throws IOException{
+        List<Archive> found=new ArrayList<>();
+        for(Path p:candidates){
+            if(!p.getFileName().toString().matches(NAME))continue;
+            try{
+                BasicFileAttributes attrs=Files.readAttributes(p,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);
+                if(attrs.isRegularFile())found.add(new Archive(p,attrs.size(),attrs.lastModifiedTime().toMillis()));
+            }catch(NoSuchFileException vanished){
+                // Retention may remove an archive after directory enumeration. Other I/O errors still surface.
+            }
+        }
+        found.sort(Comparator.comparingLong(Archive::modified).thenComparing(a->a.path().getFileName().toString()).reversed());
+        return List.copyOf(found);
+    }
+    private List<Archive> archiveSnapshot()throws IOException{
+        try(var paths=Files.list(directory())){return inspectArchives(paths.toList());}
+    }
     List<Path> archives()throws IOException{
-        try(var paths=Files.list(directory())){return paths.filter(p->p.getFileName().toString().matches(NAME)&&Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS)).sorted(Comparator.comparingLong(SupportArchives::modified).thenComparing(p->p.getFileName().toString()).reversed()).toList();}
+        return archiveSnapshot().stream().map(Archive::path).toList();
     }
     Path download(String name)throws IOException{
         if(!name.matches(NAME))throw new IOException("Invalid support ZIP name");
@@ -65,7 +85,7 @@ final class SupportArchives implements AutoCloseable {
     }
     String statusJson()throws IOException{
         StringBuilder b=new StringBuilder("{\"busy\":").append(busy).append(",\"lastError\":").append(Json.q(lastError)).append(",\"lastCreated\":").append(Json.q(lastCreated)).append(",\"onTestFailure\":").append(cfg.getBoolean("support.onTestFailure",false)).append(",\"archives\":[");boolean first=true;
-        for(Path p:archives().stream().limit(50).toList()){if(!first)b.append(',');first=false;b.append("{\"name\":").append(Json.q(p.getFileName().toString())).append(",\"bytes\":").append(Files.size(p)).append(",\"createdAt\":").append(Files.getLastModifiedTime(p).toMillis()).append('}');}
+        for(Archive archive:archiveSnapshot().stream().limit(50).toList()){if(!first)b.append(',');first=false;b.append("{\"name\":").append(Json.q(archive.path().getFileName().toString())).append(",\"bytes\":").append(archive.bytes()).append(",\"createdAt\":").append(archive.modified()).append('}');}
         return b.append("]}").toString();
     }
     private String clean(String text){
