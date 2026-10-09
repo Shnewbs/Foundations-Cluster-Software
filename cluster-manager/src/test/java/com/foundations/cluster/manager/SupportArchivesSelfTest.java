@@ -8,9 +8,36 @@ public final class SupportArchivesSelfTest {
  static int checks;
  static void check(boolean b,String why){if(!b)throw new AssertionError(why);checks++;}
  static void rejects(Runnable r){try{r.run();throw new AssertionError("Expected validation failure");}catch(IllegalArgumentException e){checks++;}}
+ static void archiveSnapshotRace(Path home)throws Exception{
+  Path dir=Files.createDirectory(home.resolve("snapshot-fixture"));
+  Path a=dir.resolve("Foundations-support-20261009-000000-00000001.zip");
+  Path b=dir.resolve("Foundations-support-20261009-000000-00000002.zip");
+  Path retired=dir.resolve("Foundations-support-20261009-000000-00000003.zip");
+  Path directory=dir.resolve("Foundations-support-20261009-000000-00000004.zip");
+  Path link=dir.resolve("Foundations-support-20261009-000000-00000005.zip");
+  Path other=dir.resolve("user-backup.zip");
+  Files.writeString(a,"one");Files.writeString(b,"four");Files.writeString(retired,"retired");Files.writeString(other,"keep");
+  Files.createDirectory(directory);Files.createSymbolicLink(link,a);
+  var timestamp=java.nio.file.attribute.FileTime.fromMillis(1000);
+  Files.setLastModifiedTime(a,timestamp);Files.setLastModifiedTime(b,timestamp);
+  List<Path> listed=List.of(retired,a,directory,other,b,link);
+  Files.delete(retired); // Deterministic deletion between listing and metadata inspection.
+  var snapshot=SupportArchives.inspectArchives(listed);
+  check(snapshot.size()==2,"Missing/non-regular/unrelated candidates were not excluded");
+  check(snapshot.get(0).path().equals(b)&&snapshot.get(1).path().equals(a),"Equal-time archive ordering changed");
+  check(snapshot.get(0).bytes()==4&&snapshot.get(1).bytes()==3,"Snapshot size mismatch");
+  check(snapshot.get(0).modified()==Files.getLastModifiedTime(b).toMillis(),"Snapshot timestamp mismatch");
+  Files.delete(b);
+  check(snapshot.get(0).bytes()==4,"Metadata must remain usable after retention removes the file");
+  check(SupportArchives.inspectArchives(listed).size()==1,"Fresh snapshot must omit newly retired archive");
+  Files.delete(a);
+  check(SupportArchives.inspectArchives(listed).isEmpty(),"Dangling symlink must not be followed");
+  try{snapshot.clear();throw new AssertionError("Mutable metadata snapshot");}catch(UnsupportedOperationException expected){checks++;}
+ }
  public static void main(String[] args)throws Exception{
   Path home=Files.createTempDirectory("foundations-support-test-");
   try{
+   archiveSnapshotRace(home);
    Files.createDirectories(home.resolve("config"));Files.writeString(home.resolve("config/cluster.properties"),"support.keepCount=2\nsupport.maxLogMiB=1\n");
    ManagerConfig cfg=ManagerConfig.load(home);ClusterLog log=new ClusterLog(home.resolve("logs/test.log"),100);
    Files.createDirectories(home.resolve("runtime/security"));Files.writeString(home.resolve("runtime/security/admin.json"),"DO_NOT_EXPORT_VAULT");
