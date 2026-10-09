@@ -1,7 +1,9 @@
 """Real authenticated HTTP support captures, exports and opt-in automation."""
-import argparse, http.cookiejar, io, json, os, pathlib, shutil, subprocess, tempfile, time, urllib.request, urllib.error, zipfile
+import argparse, http.cookiejar, io, json, os, pathlib, re, shutil, subprocess, tempfile, time, urllib.request, urllib.error, zipfile
 p=argparse.ArgumentParser();p.add_argument('--java',required=True);args=p.parse_args()
-root=pathlib.Path(__file__).resolve().parents[1];home=pathlib.Path(tempfile.mkdtemp(prefix='foundations-support-api-'));(home/'config').mkdir()
+root=pathlib.Path(__file__).resolve().parents[1]
+expected_package=re.search(r'PACKAGE_REVISION = "([^"]+)"',(root/'cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java').read_text()).group(1)
+home=pathlib.Path(tempfile.mkdtemp(prefix='foundations-support-api-'));(home/'config').mkdir()
 (home/'config/cluster.properties').write_text('web.bind=127.0.0.1\nweb.port=18774\nstartup.autoStartWorkers=false\ntemplate.autoBootstrap=false\nnodeAgent.required=false\ngateway.enabled=false\nworld.seed=1234\nlayer.autoSplit=false\nlayer.autoMerge=false\nregion.autoFailover=false\n')
 (home/'logs').mkdir();(home/'logs/fixture.log').write_text('Support regression marker\npassword=fixture-must-be-redacted\n')
 cp=os.pathsep.join(str(root/x) for x in ['cluster-manager/build/FoundationsClusterManager.jar','cluster-manager/lib/bcprov.jar'])
@@ -38,7 +40,7 @@ try:
  check(not state['lastError'] and len(state['archives'])==1,'Capture listed without errors')
  status,data=req('/api/support/download?name='+state['lastCreated'],raw=True);check(status==200,'ZIP downloaded')
  with zipfile.ZipFile(io.BytesIO(data)) as z:
-  manifest=json.loads(z.read('manifest.json'));check(manifest['package']=='0.0.6a.R19-HF15','Archive identifies hotfix')
+  manifest=json.loads(z.read('manifest.json'));check(manifest['package']==expected_package,'Archive identifies candidate hotfix')
   check(b'Support regression marker' in z.read('logs/fixture.log') and b'fixture-must-be-redacted' not in z.read('logs/fixture.log'),'Logs included and credential label redacted')
   check(b'FAIL region RECOVERING' in z.read('test-report.txt'),'Failure report included')
   check(all(not n.startswith(('runtime/security','config/','workers/')) for n in z.namelist()),'Excluded files absent from real export')
