@@ -14,6 +14,10 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 /** Bounded, read-only world signature for transfer diagnostics. Never loads a missing chunk. */
 final class PersistenceProbe {
     static void register(RegisterCommandsEvent event) {
+        event.getDispatcher().register(Commands.literal("foundations_interaction_status").requires(s->s.hasPermission(2))
+            .executes(c->{c.getSource().sendSuccess(()->Component.literal(
+                "FOUNDATIONS_INTERACTION_STATUS node="+FoundationsClusterNode.VERSION+
+                " remoteSurvival=false stage=SPIKE_A_C reason=chunk_entity_and_player_recovery_gates_pending"),false);return 1;}));
         event.getDispatcher().register(Commands.literal("foundations_growth_status").requires(s->s.hasPermission(2))
             .then(Commands.argument("pos",BlockPosArgument.blockPos()).executes(c->{
                 String report=FoundationsClusterNode.growthStatus(c.getSource().getLevel(),BlockPosArgument.getBlockPos(c,"pos"));

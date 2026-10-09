@@ -52,7 +52,7 @@ cp = os.pathsep.join([str(tests), cp])
 for name in ['R16SelfTest', 'R17SelfTest', 'R18SelfTest', 'R19SelfTest', 'NodeUpgradeSelfTest', 'NodeStartupSelfTest', 'R19HydrationSelfTest', 'SupportArchivesSelfTest', 'RestartAvailabilitySelfTest', 'HardeningSelfTest']:
     run(a.java, '-cp', cp, 'com.foundations.cluster.manager.' + name, ROOT, *(['--fixture'] if name == 'NodeUpgradeSelfTest' else []))
 reference = compile_to('reference/build/classes', ROOT.glob('reference/src/**/*.java'))
-for name in ['transfer.RegionTransferCoordinatorSelfTest', 'persistence.PersistentRegionTransferSelfTest', 'replication.ReplicationProtocolSelfTest']:
+for name in ['transfer.RegionTransferCoordinatorSelfTest', 'persistence.PersistentRegionTransferSelfTest', 'replication.ReplicationProtocolSelfTest', 'replication.AuthorityResultJournalSelfTest']:
     run(a.java, '-cp', reference, 'com.foundations.cluster.' + name)
 node = compile_to('minecraft-agent/build/persistence-test-classes', [ROOT / f'minecraft-agent/src/main/java/com/foundations/cluster/node/{n}.java' for n in ['AuthorityHydration', 'RemoteTickLeases']] + [ROOT / f'tests/{n}SelfTest.java' for n in ['AuthorityHydration', 'RemoteTickLeases']])
 for name in ['AuthorityHydration', 'RemoteTickLeases']:

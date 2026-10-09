@@ -9,12 +9,37 @@ base { archivesName = mod_id }
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 sourceSets.main.java.srcDir('../protocol/src/main/java')
 repositories { mavenCentral() }
+sourceSets {
+    spike {
+        java.srcDir('../reference/src/main/java/com/foundations/cluster/replication')
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    spikeImplementation.extendsFrom implementation
+    spikeRuntimeOnly.extendsFrom runtimeOnly
+}
 neoForge {
     version = neo_version
+    addModdingDependenciesTo(sourceSets.spike)
     runs {
         server { server(); programArgument '--nogui' }
         client { client() }
+        survivalSpike {
+            type = 'gameTestServer'
+            programArguments = ['--spawnPos', '0,60,0']
+            sourceSet = sourceSets.spike
+            gameDirectory = layout.buildDirectory.dir('survival-spike-world').get().asFile
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'foundations_cluster_spike'
+            environment 'FOUNDATIONS_CLUSTER_AGENT_TOKEN', ''
+        }
     }
-    mods { "${mod_id}" { sourceSet(sourceSets.main) } }
+    mods {
+        "${mod_id}" { sourceSet(sourceSets.main) }
+        foundations_cluster_spike { sourceSet(sourceSets.spike) }
+    }
+    runs.server.loadedMods = [mods[mod_id]]
+    runs.client.loadedMods = [mods[mod_id]]
 }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }

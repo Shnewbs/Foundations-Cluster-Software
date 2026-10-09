@@ -15,7 +15,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: source with spaces
@@ -36,6 +36,16 @@ jobs:
           node-version: '22'
       - name: Compile and run Java, UI and HTTP regressions
         run: python tools/validate.py
+      - name: Build Node and run actual NeoForge Survival spike
+        run: python tools/validate_survival_spike.py
+      - name: Preserve Survival spike evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: survival-spike-${{ runner.os }}
+          path: source with spaces/minecraft-agent/build/reports/survival-spike/*
+          if-no-files-found: warn
+          retention-days: 14
       - name: Exercise Windows launch build scripts
         if: runner.os == 'Windows'
         shell: powershell
@@ -92,5 +102,5 @@ jobs:
           if gh release view "v$version" >/dev/null 2>&1; then
             echo "Release v$version already exists; immutable assets left unchanged."
           else
-            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Test Lab fixture repair" --notes-file "release_notes/$version.md"
+            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Survival interaction groundwork" --notes-file "release_notes/$version.md"
           fi

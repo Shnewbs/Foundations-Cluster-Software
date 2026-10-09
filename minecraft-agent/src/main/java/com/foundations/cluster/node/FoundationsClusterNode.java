@@ -55,7 +55,7 @@ import java.util.zip.GZIPOutputStream;
 @Mod(FoundationsClusterNode.MOD_ID)
 public final class FoundationsClusterNode {
     public static final String MOD_ID = "foundations_cluster_node";
-    public static final String VERSION = "0.0.6a.R13";
+    public static final String VERSION = "0.0.6a.R14";
     public static final int WORLD_IDENTITY_SCHEMA = 2;
     private static volatile FoundationsClusterNode activeNode;
     private static final Logger LOG = LoggerFactory.getLogger("Foundations Cluster Node");
@@ -137,6 +137,7 @@ public final class FoundationsClusterNode {
     private final ScheduledExecutorService persistenceRetries=Executors.newSingleThreadScheduledExecutor(r->{Thread t=new Thread(r,"foundations-persistence-retry");t.setDaemon(true);return t;});
     private final Object persistencePostLock = new Object();
     private CompletableFuture<Void> persistenceTail = CompletableFuture.completedFuture(null);
+    private final Map<UUID,Long> survivalNoticeAt = new HashMap<>();
     private final ConcurrentHashMap<String,Long> handoffCommandThrottle = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String,SimulationRoute> simulationRoutes = new ConcurrentHashMap<>();
     private volatile String simulationRouteToken = "";
@@ -244,6 +245,7 @@ public final class FoundationsClusterNode {
     }
 
     private void playerLoggedOut(PlayerEvent.PlayerLoggedOutEvent e) {
+        survivalNoticeAt.remove(e.getEntity().getUUID());
         if (e.getEntity() instanceof ServerPlayer player && !token.isBlank()) {
             flushPlayerProgress(player);
             post("/api/agent/player-state", playerStateBody(player));
@@ -473,7 +475,7 @@ public final class FoundationsClusterNode {
         SimulationRoute r=routeForRegion(regionIdForBlock("foundations",dimension,pos),dimension);
         if(r==null||r.authorityWorkerId().isBlank()||r.authorityWorkerId().equals(workerId))return;
         e.setCanceled(true);
-        if(player.gameMode.getGameModeForPlayer()!=GameType.CREATIVE){LOG.debug("Remote block prototype denied non-creative break for {}",player.getGameProfile().getName());return;}
+        if(player.gameMode.getGameModeForPlayer()!=GameType.CREATIVE){noticeUnsupportedSurvival(player);return;}
         publishBlockRequest(r,"BREAK",dimension,pos,"");
     }
 
@@ -484,8 +486,17 @@ public final class FoundationsClusterNode {
         SimulationRoute r=routeForRegion(regionIdForBlock("foundations",dimension,pos),dimension);
         if(r==null||r.authorityWorkerId().isBlank()||r.authorityWorkerId().equals(workerId))return;
         e.setCanceled(true);
-        if(player.gameMode.getGameModeForPlayer()!=GameType.CREATIVE){LOG.debug("Remote block prototype denied non-creative placement for {}",player.getGameProfile().getName());return;}
+        if(player.gameMode.getGameModeForPlayer()!=GameType.CREATIVE){noticeUnsupportedSurvival(player);return;}
         publishBlockRequest(r,"PLACE",dimension,pos,encodeBlockState(e.getPlacedBlock()));
+    }
+
+    private void noticeUnsupportedSurvival(ServerPlayer player) {
+        long now=System.nanoTime(), last=survivalNoticeAt.getOrDefault(player.getUUID(),0L);
+        if(last==0L || now-last>=TimeUnit.SECONDS.toNanos(5)) {
+            survivalNoticeAt.put(player.getUUID(),now);
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                "Survival editing in this replicated area is not enabled yet."),true);
+        }
     }
 
     private void publishBlockRequest(SimulationRoute r,String op,String dimension,BlockPos pos,String blockState){

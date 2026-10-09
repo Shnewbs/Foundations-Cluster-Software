@@ -2,8 +2,8 @@ param([Parameter(Mandatory=$true)][string]$ClusterRoot, [string]$Rollback)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-# Reviewed HF14 control-plane, gateway and Test Lab payload; operator data is excluded.
-$allowed = @('tools/start_foundations.ps1','cluster-manager/lib/bcprov.jar','cluster-manager/build/FoundationsClusterManager.jar','tools/setup_velocity.ps1','tools/build_gateway.ps1','velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/conduit-r15-patch/SeamlessConfigSessionHandler.java','tools/conduit-r15-patch/FoundationsHandshakeCapture.java','tools/conduit-r15-patch/FoundationsTagConfiguration.java','tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java','tools/conduit-r15-patch/GPL-3.0.txt','tools/conduit-r15-patch/README.txt','velocity-gateway/source/FoundationsVelocityGateway.java','velocity-gateway/resources/velocity-plugin.json','web/app.js','web/index.html')
+# Reviewed HF15 control-plane, gateway, Node build and Test Lab payload; operator data is excluded.
+$allowed = @('tools/start_foundations.ps1','cluster-manager/lib/bcprov.jar','cluster-manager/build/FoundationsClusterManager.jar','tools/setup_velocity.ps1','tools/build_gateway.ps1','velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/conduit-r15-patch/SeamlessConfigSessionHandler.java','tools/conduit-r15-patch/FoundationsHandshakeCapture.java','tools/conduit-r15-patch/FoundationsTagConfiguration.java','tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java','tools/conduit-r15-patch/GPL-3.0.txt','tools/conduit-r15-patch/README.txt','velocity-gateway/source/FoundationsVelocityGateway.java','velocity-gateway/resources/velocity-plugin.json','web/app.js','web/index.html','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar')
 $ClusterRoot = [IO.Path]::GetFullPath($ClusterRoot).TrimEnd('\','/')
 function Safe-Path([string]$base, [string]$relative) {
     if (!$relative -or $relative -notmatch '^[A-Za-z0-9_./-]+$' -or $relative.StartsWith('/') -or $relative -match '(^|/)(\.|\.\.)(/|$)' -or $relative.Contains('//')) { throw "Unsafe path: $relative" }
@@ -80,7 +80,7 @@ try {
     if (Test-Path -LiteralPath $marker) { throw 'Previous update interrupted. Use -Rollback with the backup named in runtime/update-in-progress.json.' }
     $package=Split-Path -Parent $PSScriptRoot
     $manifest=Get-Content -LiteralPath (Safe-Path $package 'UPDATE_MANIFEST.json') -Raw | ConvertFrom-Json
-    if ($manifest.schema -ne 1 -or $manifest.component -ne 'manager-gateway' -or $manifest.version -ne '0.0.6a.R19-HF14') { throw 'Unsupported updater manifest' }
+    if ($manifest.schema -ne 1 -or $manifest.component -ne 'manager-gateway-node' -or $manifest.version -ne '0.0.6a.R19-HF15') { throw 'Unsupported updater manifest' }
     $jar=Destination 'cluster-manager/build/FoundationsClusterManager.jar'
     $zip=[IO.Compression.ZipFile]::OpenRead($jar)
     try {
@@ -88,7 +88,7 @@ try {
         if (!$entry) { throw 'Manager version class missing' }
         $reader=[IO.StreamReader]::new($entry.Open(),[Text.Encoding]::ASCII)
         try { $versionBytes=$reader.ReadToEnd() } finally { $reader.Dispose() }
-        if ($versionBytes -notmatch '0\.0\.6a\.R19-HF(?:11|12|13|14)(?![0-9])') { throw 'This updater requires the HF11/Node R13 baseline, HF12, HF13 or HF14. Install the matching baseline first.' }
+        if ($versionBytes -notmatch '0\.0\.6a\.R19-HF(?:11|12|13|14|15)(?![0-9])') { throw 'This updater requires the HF11/Node R13 baseline, HF12, HF13, HF14 or HF15. Install the matching baseline first.' }
     } finally { $zip.Dispose() }
     $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     if (@($manifest.files).Count -ne $allowed.Count) { throw 'Incomplete updater manifest' }
@@ -99,7 +99,7 @@ try {
         $source=Safe-Path $package ('payload/'+$item.path)
         if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $item.sha256) { throw "Payload checksum failed: $($item.path)" }
     }
-    $relative='update-backups/HF14-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N')
+    $relative='update-backups/HF15-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N')
     $backup=Safe-Path $ClusterRoot $relative;New-Item -ItemType Directory -Path $backup | Out-Null
     $records=@()
     # Complete and flush the whole backup before modifying a single installed file.
@@ -120,7 +120,7 @@ try {
     }
     Remove-Item -LiteralPath $marker
     Write-Host "Installed $($manifest.version). Backup: $backup" -ForegroundColor Green
-    Write-Host 'HF14 Manager, gateway and Test Lab installed. Worlds, credentials, configuration and Node R13 preserved. Start the cluster; gateway setup will apply the bridge.'
+    Write-Host 'HF15 installed; Node R14 is staged. Start the cluster to upgrade the template and stopped workers. Worlds, credentials and configuration were preserved. Remote Survival editing remains disabled.'
 } catch {
     $failure=$_
     if ($started) {

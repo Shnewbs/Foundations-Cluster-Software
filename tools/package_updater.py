@@ -8,8 +8,8 @@ import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 version=re.search(r'PACKAGE_REVISION = "([^"]+)"',(ROOT/'cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java').read_text()).group(1)
-assert version=='0.0.6a.R19-HF14','Review updater compatibility before changing the package version'
-paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html"]
+assert version=='0.0.6a.R19-HF15','Review updater compatibility before changing the package version'
+paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html", "minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar"]
 manager=ROOT/'cluster-manager/build/FoundationsClusterManager.jar'
 with zipfile.ZipFile(manager) as jar:
     data=jar.read('com/foundations/cluster/manager/ClusterVersion.class')
@@ -30,8 +30,14 @@ with zipfile.ZipFile(ROOT/'velocity-gateway/build/libs/foundations_velocity_gate
     meta=json.loads(plugin.read('velocity-plugin.json'))
     assert meta['id']=='foundations_gateway' and meta['version']=='0.0.6a.R19','Wrong gateway metadata'
     assert plugin.read('com/foundations/cluster/velocity/FoundationsVelocityGateway.class')[:8]==bytes.fromhex('cafebabe00000041'),'Gateway plugin must target Java 21'
+# Node is compiled and exercised on both CI platforms before packaging.
+with zipfile.ZipFile(ROOT/'minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar') as node:
+    assert 'version="0.0.6a.R14"' in node.read('META-INF/neoforge.mods.toml').decode()
+    assert node.read('com/foundations/cluster/node/FoundationsClusterNode.class')[:8]==bytes.fromhex('cafebabe00000041')
+    assert 'com/foundations/cluster/node/interaction/AuthorityBreakExecutor.class' in node.namelist()
+    assert not any('/spike/' in n or 'foundations_cluster_spike' in n for n in node.namelist()), 'Test mod must not ship to operator worlds'
 files=[{'path':path,'sha256':hashlib.sha256((ROOT/path).read_bytes()).hexdigest()} for path in paths]
-manifest={'schema':1,'component':'manager-gateway','version':version,'requires':'0.0.6a.R19-HF11 or HF12 or HF13 or HF14 / Node R13','files':files}
+manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'0.0.6a.R19-HF11 through HF15; upgrades Node to R14','files':files}
 output=ROOT/'dist';output.mkdir(exist_ok=True)
 archive=output/f'FoundationsCluster-{version}-UPDATER.zip'
 launcher='''@echo off

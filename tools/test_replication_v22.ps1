@@ -10,7 +10,8 @@ $argsFile = Join-Path $build 'sources.txt'
 if ($LASTEXITCODE -ne 0) { throw 'Reference compilation failed' }
 foreach ($test in @('com.foundations.cluster.transfer.RegionTransferCoordinatorSelfTest',
     'com.foundations.cluster.persistence.PersistentRegionTransferSelfTest',
-    'com.foundations.cluster.replication.ReplicationProtocolSelfTest')) {
+    'com.foundations.cluster.replication.ReplicationProtocolSelfTest',
+    'com.foundations.cluster.replication.AuthorityResultJournalSelfTest')) {
     & java -cp $build $test
     if ($LASTEXITCODE -ne 0) { throw "Failed: $test" }
 }

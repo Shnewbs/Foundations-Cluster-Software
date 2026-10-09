@@ -1,0 +1,7 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+[[mods]]
+modId="foundations_cluster_spike"
+version="1"
+displayName="Foundations Survival Spike (disposable test worlds only)"

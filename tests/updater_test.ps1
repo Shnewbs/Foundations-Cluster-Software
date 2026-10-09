@@ -41,7 +41,7 @@ try {
     Check ((Get-Content (Join-Path $install 'tools/setup_velocity.ps1') -Raw) -eq 'previous gateway setup') 'Rollback did not restore gateway setup'
     Check ((Get-Content (Join-Path $install 'web/app.js') -Raw) -eq 'previous dashboard') 'Rollback did not restore dashboard'
     Check ((Get-Content (Join-Path $install 'web/index.html') -Raw) -eq 'previous page') 'Rollback did not restore page'
-    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1')){
+    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar')){
         Check (!(Test-Path -LiteralPath (Join-Path $install $path))) 'Rollback left a newly added gateway artifact'
     }
     $payload=Join-Path $package 'payload/cluster-manager/lib/bcprov.jar';$good=[IO.File]::ReadAllBytes($payload)

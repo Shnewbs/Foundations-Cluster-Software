@@ -8,3 +8,4 @@ find "$ROOT/reference/src/main/java" "$ROOT/reference/src/test/java" -name '*.ja
 java -cp "$BUILD" com.foundations.cluster.transfer.RegionTransferCoordinatorSelfTest
 java -cp "$BUILD" com.foundations.cluster.persistence.PersistentRegionTransferSelfTest
 java -cp "$BUILD" com.foundations.cluster.replication.ReplicationProtocolSelfTest
+java -cp "$BUILD" com.foundations.cluster.replication.AuthorityResultJournalSelfTest

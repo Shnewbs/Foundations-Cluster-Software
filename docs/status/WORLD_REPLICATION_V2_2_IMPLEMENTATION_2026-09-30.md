@@ -1,5 +1,8 @@
 # World Replication v2.2 - first implementation slice
 
+Historical record. For the next actual NeoForge integration slice, see
+[HF15 Spike A/C](WORLD_REPLICATION_V2_2_SPIKE_A_C_2026-10-09.md).
+
 Date: 2026-09-30. Baseline: HF11 / Manager R19 / Node R13, Minecraft 1.21.1,
 NeoForge 21.1.250. Runtime version markers remain unchanged.
 
