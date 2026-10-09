@@ -7,7 +7,7 @@ permissions:
   contents: read
 concurrency:
   group: validate-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feature/0.0.7a-survival-foundation' || github.head_ref == 'feature/0.0.7a-survival-foundation' }}
 jobs:
   regression:
     strategy:
