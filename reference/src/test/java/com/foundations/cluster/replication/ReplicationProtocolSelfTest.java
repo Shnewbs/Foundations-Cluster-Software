@@ -17,6 +17,7 @@ public final class ReplicationProtocolSelfTest {
         try {
             restartMatrix(root); abortAndIdentity(root); tornTailAndCorruption(root); semanticCorruption(root); timeSkew();
             System.out.println("World Replication v2.2 protocol model: " + checks + " checks PASS");
+            PlayerLedgerRecoverySelfTest.main(new String[0]);
         } finally {
             try (var paths = Files.walk(root)) {
                 for (Path p : paths.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
@@ -34,7 +35,7 @@ public final class ReplicationProtocolSelfTest {
         byte[] data=Files.readAllBytes(good);
         var records=new java.util.ArrayList<byte[]>();
         for (int offset=0;offset<data.length;) {
-            int length=java.nio.ByteBuffer.wrap(data,offset,4).getInt()+8;
+            int length=java.nio.ByteBuffer.wrap(data,offset+4,4).getInt()+16;
             records.add(java.util.Arrays.copyOfRange(data,offset,offset+length));offset+=length;
         }
         int count=0;
@@ -110,7 +111,8 @@ public final class ReplicationProtocolSelfTest {
         Path good = root.resolve("good");
         try (var ledger = new PlayerOperationLedger(good, CLUSTER, PLAYER)) { ledger.prepare(SLOT); }
         byte[] original = Files.readAllBytes(good);
-        for (byte[] tail : new byte[][] { {0}, {0,0,0}, {0,0,0,20,1,2,3} }) {
+        for (byte[] tail : new byte[][] { {0x46}, {0x46,0x43,0x50},
+                java.nio.ByteBuffer.allocate(15).putInt(0x46435032).putInt(20).putInt(~20).put(new byte[]{1,2,3}).array() }) {
             Path torn = root.resolve("torn-" + tail.length);
             Files.write(torn, original); Files.write(torn, tail, StandardOpenOption.APPEND);
             try (var ledger = new PlayerOperationLedger(torn, CLUSTER, PLAYER)) {
