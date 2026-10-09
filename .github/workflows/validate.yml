@@ -46,6 +46,19 @@ jobs:
           path: source with spaces/minecraft-agent/build/reports/survival-spike/*
           if-no-files-found: warn
           retention-days: 14
+      - name: Package and rerun development experiment JAR
+        if: runner.os == 'Linux'
+        run: python tools/package_development.py
+      - name: Preserve development experiment bundle
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: survival-development
+          path: |
+            source with spaces/development-dist/*-EXPERIMENTS.zip
+            source with spaces/development-dist/*-EXPERIMENTS.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
       - name: Exercise Windows launch build scripts
         if: runner.os == 'Windows'
         shell: powershell
@@ -103,4 +116,29 @@ jobs:
             echo "Release v$version already exists; immutable assets left unchanged."
           else
             gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Worker controls and recovery" --notes-file "release_notes/$version.md"
+          fi
+  development-release:
+    needs: regression
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/0.0.7a-survival-foundation'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: survival-development
+          path: development-dist
+      - name: Publish clearly separated development experiments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.0.7a-dev.1 >/dev/null 2>&1; then
+            echo 'Existing development release is immutable; assets not replaced.'
+          else
+            gh release create v0.0.7a-dev.1 development-dist/* --target "$GITHUB_SHA" --prerelease --latest=false --title 'Foundations Cluster 0.0.7a-dev.1 — Inventory/save experiments, NOT playable 7a' --notes-file docs/status/0_0_7A_DEVELOPMENT_1.md
           fi

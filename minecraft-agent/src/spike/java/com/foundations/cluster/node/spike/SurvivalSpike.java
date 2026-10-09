@@ -13,6 +13,14 @@ public final class SurvivalSpike {
         DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, "foundations_cluster_spike");
     static final Supplier<AttachmentType<CompoundTag>> APPLIED = ATTACHMENTS.register("applied_operations",
         () -> AttachmentType.builder(() -> new CompoundTag()).serialize(CompoundTag.CODEC).build());
+    static final Supplier<AttachmentType<CompoundTag>> BROKEN_APPLIED = ATTACHMENTS.register("broken_applied_operations",
+        () -> AttachmentType.builder(() -> new CompoundTag()).serialize(CompoundTag.CODEC.flatXmap(
+            value -> com.mojang.serialization.DataResult.success(value),
+            value -> com.mojang.serialization.DataResult.error(() -> "INJECTED operation marker codec failure"))).build());
+    private static final DeferredRegister<net.minecraft.core.component.DataComponentType<?>> COMPONENTS =
+        DeferredRegister.create(net.minecraft.core.registries.Registries.DATA_COMPONENT_TYPE, "foundations_cluster_spike");
+    static final Supplier<net.minecraft.core.component.DataComponentType<String>> TRANSIENT_COMPONENT = COMPONENTS.register("transient_component",
+        () -> net.minecraft.core.component.DataComponentType.<String>builder().networkSynchronized(net.minecraft.network.codec.StreamCodec.unit("transient")).build());
     private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks("foundations_cluster_spike");
     static final Supplier<net.minecraft.world.level.block.Block> REFUSES_REMOVAL = BLOCKS.register("refuses_removal",
         () -> new net.minecraft.world.level.block.Block(net.minecraft.world.level.block.state.BlockBehaviour.Properties.of().strength(1)) {
@@ -21,5 +29,5 @@ public final class SurvivalSpike {
                     net.minecraft.world.entity.player.Player player, boolean harvest,
                     net.minecraft.world.level.material.FluidState fluid) { return false; }
         });
-    public SurvivalSpike(IEventBus bus) { ATTACHMENTS.register(bus); BLOCKS.register(bus); }
+    public SurvivalSpike(IEventBus bus) { ATTACHMENTS.register(bus); BLOCKS.register(bus); COMPONENTS.register(bus); }
 }
