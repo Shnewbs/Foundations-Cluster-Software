@@ -2,6 +2,8 @@ package com.foundations.cluster.replication;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -215,6 +217,10 @@ public final class PlayerLedgerRecoverySelfTest {
             }
             reader.shutdownNow();
         }
+        // A reaped Windows process can still have OS lock cleanup pending (LockFileEx docs).
+        // Probe only after confirmed forced death; never retry parse errors or bypass a live writer.
+        awaitJournalUnlock(directory.resolve("player"));
+        awaitJournalUnlock(directory.resolve("authority"));
         Stage expected = switch (boundary) {
             case PREPARED -> Stage.PREPARED;
             case WORLD_EXECUTED, AUTHORITY_ONLY -> Stage.WORLD_EXECUTED;
@@ -250,6 +256,17 @@ public final class PlayerLedgerRecoverySelfTest {
             check(player.prepare(new Reservation(13, 1, "next-tool", 1)).id().counter() == 1,
                 "operation counter is not reused after process death");
         }
+    }
+    private static void awaitJournalUnlock(Path path) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        do {
+            try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
+                 FileLock probe = channel.tryLock()) {
+                if (probe != null) return;
+            }
+            Thread.sleep(20);
+        } while (System.nanoTime() < deadline);
+        throw new IOException("OS did not release terminated fixture journal lock: " + path);
     }
     private static void preservedRejection(Path path, byte[] bytes) throws Exception {
         Files.write(path, bytes);
