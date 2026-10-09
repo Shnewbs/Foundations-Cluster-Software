@@ -1,31 +1,36 @@
-Foundations Cluster 0.0.6a.R19-HF15 / Node R14 (pre-release)
-Survival interaction groundwork — remote Survival edits remain disabled.
+Foundations Cluster 0.0.6a.R19-HF16 / Node R14 (pre-release)
+Worker controls and recovery hardening
 
-1. Stop Manager, gateway and every worker.
-2. Extract this ZIP separately and run APPLY_UPDATE.bat.
-3. Select the existing stopped HF11-HF15 Cluster installation.
-4. Start Cluster normally and refresh the dashboard with Ctrl+F5.
+INSTALL
+1. Stop Manager, gateway and every worker. Confirm the Java processes have exited.
+2. Extract this updater separately, not over the running installation.
+3. Run APPLY_UPDATE.bat and select the existing Cluster folder.
+4. Start Foundations normally, then refresh the dashboard with Ctrl+F5.
 
-The package includes the compiled Node R14. Manager installs it into the
-configured template and upgrades stopped workers with backups. You do not need
-to download the full source or Gradle to apply this updater.
+Accepts HF11 through HF16. Includes the compiled Manager, R19 gateway artifacts,
+Node R14, and the complete dashboard script/style set. Manager installs the staged
+Node into its configured template and synchronizes stopped workers through the
+existing backup-preserving path. No Gradle download is needed for this updater.
 
-Node explains rejected Survival edits and provides foundations_interaction_status.
-The new authority executor, durable-result journal and real NeoForge tests are
-groundwork. Safe cross-worker inventory/entity recovery is still a release gate;
-this update does not remove the Creative-only restriction.
+CONTROLS
+Restart Servers: rolling restart of managed Minecraft workers only; Manager and
+gateway stay online. Shutdown Cluster: closes Manager and its owned gateway and
+requests shutdown of managed workers; external processes are not terminated.
+Click a worker row to open details. Restart, Stop and Kill are adjacent actions.
+Stop is graceful and evacuation-aware. Kill immediately terminates the process
+and may lose unsaved world changes; it is an emergency action with confirmation.
 
-Worlds, credentials, player profiles, journals, active settings and seamless mode
-are preserved. No experimental test mod or test world is deployed.
+DATA AND ROLLBACK
+Worlds, profiles, credentials, active configuration and runtime journals are not
+payload files. Existing application files are backed up before replacement.
+Keep this updater and the matching printed update-backups/HF16-... directory.
+Rollback with this updater's tools/apply_update.ps1 -ClusterRoot <installation>
+-Rollback <matching backup path>. Older updater backups need their matching tools.
+Later Node/template synchronization and gateway runtime patches have separate
+backups. Never delete a world to resolve a Node version mismatch.
 
-Rollback while stopped, using this updater:
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\apply_update.ps1 -ClusterRoot "C:\Your\Cluster" -Rollback "C:\Your\Cluster\update-backups\HF15-..."
-
-Keep this ZIP for rollback; older backups require their matching updater.
-After Manager has installed Node R14, restoring payloads alone does not reverse
-its template/worker Node copies. Restore the matching prior Node backups when
-reverting to an older Manager; never delete worker worlds.
-If interrupted, use the backup named in runtime/update-in-progress.json.
-
-Detailed changes, test evidence and remaining gates are in the HF15 GitHub
-release notes and docs/status/WORLD_REPLICATION_V2_2_SPIKE_A_C_2026-10-09.md.
+LIMITS
+The recovery reference model is integrated in source, not connected to production
+Minecraft inventories. Remote Survival breaking and placement remain disabled.
+Browser tests use simulated workers; live-client and multi-worker acceptance
+remain separate. Read release_notes/0.0.6a.R19-HF16.md in the repository for scope.

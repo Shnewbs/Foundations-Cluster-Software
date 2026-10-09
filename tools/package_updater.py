@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the reviewed control-plane and gateway files; never glob an installation."""
+"""Package reviewed application files only; never glob an operator installation."""
 import hashlib
 import json
 from pathlib import Path
@@ -8,8 +8,15 @@ import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 version=re.search(r'PACKAGE_REVISION = "([^"]+)"',(ROOT/'cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java').read_text()).group(1)
-assert version=='0.0.6a.R19-HF15','Review updater compatibility before changing the package version'
-paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html", "minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar"]
+assert version=='0.0.6a.R19-HF16','Review updater compatibility before changing the package version'
+paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html","web/operations.js","web/operations.css","web/styles.css","web/icons.svg","web/features.json","web/worker-controls.js","web/worker-controls.css","minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar"]
+# The applicator must authorize exactly the payload paths, including rollback of new UI files.
+applicator=(ROOT/'tools/apply_update.ps1').read_text()
+allowed=re.search(r'\$allowed\s*=\s*@\(([^\n]+)\)',applicator).group(1)
+assert paths==re.findall(r"'([^']+)'",allowed),'Updater payload and rollback allowlist differ'
+assert len(paths)==len(set(paths)), 'Duplicate payload path'
+assert '/worker-controls.js' in (ROOT/'web/operations.js').read_text(), 'Worker controls loader missing'
+assert '/worker-controls.css' in (ROOT/'web/operations.js').read_text(), 'Worker control styles loader missing'
 manager=ROOT/'cluster-manager/build/FoundationsClusterManager.jar'
 with zipfile.ZipFile(manager) as jar:
     data=jar.read('com/foundations/cluster/manager/ClusterVersion.class')
@@ -37,7 +44,7 @@ with zipfile.ZipFile(ROOT/'minecraft-agent/build/libs/foundations_cluster_node-0
     assert 'com/foundations/cluster/node/interaction/AuthorityBreakExecutor.class' in node.namelist()
     assert not any('/spike/' in n or 'foundations_cluster_spike' in n for n in node.namelist()), 'Test mod must not ship to operator worlds'
 files=[{'path':path,'sha256':hashlib.sha256((ROOT/path).read_bytes()).hexdigest()} for path in paths]
-manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'0.0.6a.R19-HF11 through HF15; upgrades Node to R14','files':files}
+manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'0.0.6a.R19-HF11 through HF16; stages Node R14','files':files}
 output=ROOT/'dist';output.mkdir(exist_ok=True)
 archive=output/f'FoundationsCluster-{version}-UPDATER.zip'
 launcher='''@echo off

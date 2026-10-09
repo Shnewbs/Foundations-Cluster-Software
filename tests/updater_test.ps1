@@ -24,6 +24,8 @@ try {
     Put 'tools/setup_velocity.ps1' 'previous gateway setup'
     Put 'web/app.js' 'previous dashboard'
     Put 'web/index.html' 'previous page'
+    Put 'web/operations.js' 'previous workspace'
+    Put 'web/operations.css' 'previous workspace styles'
     $jar=Join-Path $install 'cluster-manager/build/FoundationsClusterManager.jar'
     New-Item -ItemType Directory -Path (Split-Path -Parent $jar) -Force | Out-Null
     $zip=[IO.Compression.ZipFile]::Open($jar,[IO.Compression.ZipArchiveMode]::Create)
@@ -31,7 +33,11 @@ try {
     $original=(Get-FileHash $jar).Hash
     Run-Update
     $manifest=Get-Content (Join-Path $package 'UPDATE_MANIFEST.json') -Raw | ConvertFrom-Json
+    Check ($manifest.version -eq '0.0.6a.R19-HF16') 'Wrong release package'
     foreach($item in $manifest.files){Check ((Get-FileHash (Join-Path $install $item.path)).Hash -eq $item.sha256) 'Installed hash mismatch'}
+    foreach($path in @('web/operations.js','web/operations.css','web/worker-controls.js','web/worker-controls.css')){
+        Check ($path -cin @($manifest.files.path)) 'Missing worker-controls payload'
+    }
     foreach($pair in @(@('config/cluster.properties','operator config'),@('runtime/security/keep.key','fixture secret'),@('workers/worker-001/world/level.dat','fixture world'))){Check ((Get-Content (Join-Path $install $pair[0]) -Raw) -eq $pair[1]) 'Operator data changed'}
     $backup=(Get-ChildItem (Join-Path $install 'update-backups') -Directory | Select-Object -First 1).FullName
     Run-Update -backup $backup
@@ -41,8 +47,10 @@ try {
     Check ((Get-Content (Join-Path $install 'tools/setup_velocity.ps1') -Raw) -eq 'previous gateway setup') 'Rollback did not restore gateway setup'
     Check ((Get-Content (Join-Path $install 'web/app.js') -Raw) -eq 'previous dashboard') 'Rollback did not restore dashboard'
     Check ((Get-Content (Join-Path $install 'web/index.html') -Raw) -eq 'previous page') 'Rollback did not restore page'
-    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar')){
-        Check (!(Test-Path -LiteralPath (Join-Path $install $path))) 'Rollback left a newly added gateway artifact'
+    Check ((Get-Content (Join-Path $install 'web/operations.js') -Raw) -eq 'previous workspace') 'Rollback did not restore workspace'
+    Check ((Get-Content (Join-Path $install 'web/operations.css') -Raw) -eq 'previous workspace styles') 'Rollback did not restore workspace styles'
+    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R14.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg','web/features.json')){
+        Check (!(Test-Path -LiteralPath (Join-Path $install $path))) 'Rollback left a newly added application artifact'
     }
     $payload=Join-Path $package 'payload/cluster-manager/lib/bcprov.jar';$good=[IO.File]::ReadAllBytes($payload)
     [IO.File]::WriteAllText($payload,'tampered');Run-Update -Fail;[IO.File]::WriteAllBytes($payload,$good)

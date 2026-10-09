@@ -1,0 +1,15 @@
+/* HF16 explicit process scope and full-row worker navigation. */
+.server-controls,.cluster-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.cluster-controls{border-left:1px solid #526574;padding-left:12px;margin-left:4px}
+#shutdownClusterTop{color:#ffb3bb;border-color:#87515c;background:#342027}
+#shutdownClusterTop:hover:not(:disabled){background:#512b35;border-color:#c47483}
+.worker-row{cursor:pointer}
+.worker-row:hover>td{background:rgba(73,184,252,.07)}
+.worker-row:focus-visible{outline:2px solid #43e0c7;outline-offset:-2px}
+.worker-row:focus-visible>td{background:rgba(67,224,199,.08)}
+.worker-row .controls{flex-wrap:wrap;gap:5px;min-width:205px}
+.worker-row .controls button{min-height:29px;white-space:nowrap}
+.worker-kill{color:#ffb3bb}
+.topbar{height:auto;min-height:47px;gap:10px;flex-wrap:wrap;padding-top:7px;padding-bottom:7px}
+.top-actions{flex-wrap:wrap}
+@media(max-width:480px){.cluster-controls{padding-left:8px;margin-left:0}.top-actions{gap:7px}.worker-row .controls button{min-height:34px}}

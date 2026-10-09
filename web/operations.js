@@ -194,3 +194,14 @@ $('createSupportZip').onclick=async()=>{
   finally{button.disabled=false;}
 };
 setInterval(()=>{if(state.page==='diagnostics')refreshSupportArchives();},3000);
+
+// Load the worker controls after the shared operator workspace is initialized.
+(() => {
+  const style = document.createElement('link');
+  style.rel = 'stylesheet'; style.href = '/worker-controls.css';
+  document.head.appendChild(style);
+  const script = document.createElement('script');
+  script.src = '/worker-controls.js'; script.async = false;
+  script.onerror = () => toast('Worker controls could not load. Refresh the dashboard with Ctrl+F5.', 'error');
+  document.head.appendChild(script);
+})();
