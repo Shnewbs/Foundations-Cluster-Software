@@ -28,7 +28,7 @@ the player list. This is a game-path comparison, not a connected-client baseline
 AuthorityResultJournal retains complete bounded opaque result payloads,
 including real Minecraft result NBT in the integration fixture. It forces the
 journal before returning a receipt, rejects conflicting retries and stale
-epochs, and restores stable receipts/frame order after reopen. CRC32C,
+epochs, protects record framing against length corruption, and restores stable receipts/frame order after reopen. CRC32C,
 exclusive writers, bounded records and torn-tail handling are exercised.
 There is no compaction, batching, chunk replay or claim of coherent checkpoints.
 The player protocol model now consumes receipts from this real journal in tests.
@@ -46,13 +46,14 @@ world at minecraft-agent/build/survival-spike-world, spawn 0,60,0. It never uses
 an installation's worker/world directories or agent credentials.
 CI runs both suites on Windows and Linux and retains the full game-test logs.
 
-The new checks include 19 real NeoForge GameTests plus portable journal checks:
+The new checks include 20 real NeoForge GameTests plus portable journal checks:
 
 - Real stone/dirt breaks with correct/incorrect tools for both actor types.
 - Tool wear, final durability consumption, vanilla loot, and cancelled
   BreakEvent/BlockDropsEvent behavior.
 - Changed components, held-slot swaps, changed blocks, epoch fencing, reach,
   game-mode restrictions, and unbreakable bedrock.
+- Modded removal refusal after tool wear: EXECUTED is not a guarantee of an air block.
 - Actual Survival placement consumption and lever use for both actors.
 - Explicit fake-player protection-policy divergence and statistics differences.
 - Real break result NBT and deterministic drop UUIDs through authority/player
@@ -60,7 +61,7 @@ The new checks include 19 real NeoForge GameTests plus portable journal checks:
 - Vanilla/NeoForge chunk serialization to disk and readback of both the changed
   block and a chunk-attached applied-operation marker in the same image.
 - Actual compiled Node upgrade through Manager template/worker synchronization.
-- 29 authority journal checks in addition to the existing protocol regressions.
+- 33 authority journal checks in addition to the existing protocol regressions.
 
 Game tests demonstrate these scoped semantics in a single JVM. The journal
 tests reopen files; they do not simulate sudden power loss or independently

@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class AuthorityBreakExecutor {
     private AuthorityBreakExecutor() {}
 
-    public enum Outcome { BROKEN, FENCED, WRONG_MODE, UNLOADED, OUT_OF_REACH,
+    public enum Outcome { EXECUTED, FENCED, WRONG_MODE, UNLOADED, OUT_OF_REACH,
         PROTECTED, STALE_BLOCK, STALE_TOOL, UNBREAKABLE, CANCELLED }
 
     /** A reservation snapshot, including components and count, not just item type. */
@@ -54,6 +54,9 @@ public final class AuthorityBreakExecutor {
         // ItemStack.mineBlock, playerDestroy, loot modifiers and BlockDropsEvent.
         // Calling setBlock(AIR) here would silently skip those semantics.
         if (!ownsEpoch.getAsBoolean()) return Outcome.FENCED;
-        return actor.gameMode.destroyBlock(pos) ? Outcome.BROKEN : Outcome.CANCELLED;
+        // A mod may refuse block removal AFTER mineBlock has worn the tool.
+        // true means the game path executed, not that the world became air.
+        // The caller must journal observed effects even when the block remains.
+        return actor.gameMode.destroyBlock(pos) ? Outcome.EXECUTED : Outcome.CANCELLED;
     }
 }

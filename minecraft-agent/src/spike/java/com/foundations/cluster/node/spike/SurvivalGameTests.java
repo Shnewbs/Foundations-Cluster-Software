@@ -92,7 +92,7 @@ public final class SurvivalGameTests {
         h.setBlock(TARGET,block);var p=actor(h,fake,tool);
         try(var events=new Events(p,h.absolutePos(TARGET))) {
             var result=AuthorityBreakExecutor.execute(p,prepared(h,p),()->true);
-            h.assertTrue(result==Outcome.BROKEN,"Actual Survival break: "+result);
+            h.assertTrue(result==Outcome.EXECUTED,"Actual Survival break: "+result);
             h.assertBlockPresent(Blocks.AIR,TARGET);
             h.assertTrue(events.breaks==1,"BreakEvent runs exactly once");
             h.assertTrue(p.getMainHandItem().getDamageValue()==expectedDamage,"Tool wear follows Survival semantics");
@@ -114,7 +114,7 @@ public final class SurvivalGameTests {
         h.setBlock(TARGET,Blocks.STONE);var p=actor(h,fake,new ItemStack(Items.IRON_PICKAXE));
         try(var events=new Events(p,h.absolutePos(TARGET))) {
             events.cancelBreak=!dropsOnly;events.cancelDrops=dropsOnly;
-            h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==(dropsOnly?Outcome.BROKEN:Outcome.CANCELLED),"Cancellation outcome");
+            h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==(dropsOnly?Outcome.EXECUTED:Outcome.CANCELLED),"Cancellation outcome");
             h.assertBlockPresent(dropsOnly?Blocks.AIR:Blocks.STONE,TARGET);
             h.assertTrue(p.getMainHandItem().getDamageValue()==(dropsOnly?1:0),"Cancelled break cannot wear tool");
             h.assertTrue(h.getLevel().getEntitiesOfClass(ItemEntity.class,new AABB(h.absolutePos(TARGET)).inflate(.7)).isEmpty(),"No drops after cancellation");
@@ -175,14 +175,25 @@ public final class SurvivalGameTests {
         var detached=actor(h,false,new ItemStack(Items.IRON_PICKAXE));
         try(var events=new Events(detached,h.absolutePos(TARGET))) {
             events.rejectFake=true;
-            h.assertTrue(AuthorityBreakExecutor.execute(detached,prepared(h,detached),()->true)==Outcome.BROKEN,"Record actor-policy divergence, never bypass it");
+            h.assertTrue(AuthorityBreakExecutor.execute(detached,prepared(h,detached),()->true)==Outcome.EXECUTED,"Record actor-policy divergence, never bypass it");
+        }h.succeed();
+    }
+    @GameTest(template="empty") public static void refusedRemovalStillHasPlayerEffects(GameTestHelper h) {
+        h.setBlock(TARGET,SurvivalSpike.REFUSES_REMOVAL.get());
+        var p=actor(h,true,new ItemStack(Items.IRON_PICKAXE));
+        try(var events=new Events(p,h.absolutePos(TARGET))) {
+            h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==Outcome.EXECUTED,
+                "Executed path cannot be treated as an abort merely because block removal was refused");
+            h.assertBlockPresent(SurvivalSpike.REFUSES_REMOVAL.get(),TARGET);
+            h.assertTrue(p.getMainHandItem().getDamageValue()==1,"NeoForge mineBlock already wore the tool");
+            h.assertTrue(events.drops.isEmpty(),"Refused removal must not emit harvest drops");
         }h.succeed();
     }
     @GameTest(template="empty") public static void nearlyBrokenTool(GameTestHelper h) {
         h.setBlock(TARGET,Blocks.STONE);ItemStack tool=new ItemStack(Items.IRON_PICKAXE);tool.setDamageValue(tool.getMaxDamage()-1);
         var p=actor(h,true,tool);
         try(var events=new Events(p,h.absolutePos(TARGET))) {
-            h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==Outcome.BROKEN,"Last use breaks block");
+            h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==Outcome.EXECUTED,"Last use breaks block");
             h.assertTrue(p.getMainHandItem().isEmpty(),"Last durability consumes tool");
             h.assertTrue(events.drops.size()==1,"Last tool use still produces valid harvest");
         }h.succeed();
@@ -215,9 +226,15 @@ public final class SurvivalGameTests {
             try(var ledger=new PlayerOperationLedger(player,CLUSTER,p.getUUID());var journal=new AuthorityResultJournal(authority,CLUSTER,"fixture")) {
                 id=ledger.prepare(new Reservation(0,0,p.getMainHandItem().save(h.getLevel().registryAccess()).toString(),1)).id();
                 events.id=id;
-                h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==Outcome.BROKEN,"Execute real break before world receipt");
+                var beforeTool=p.getMainHandItem().save(h.getLevel().registryAccess());
+                var beforeBlock=NbtUtils.writeBlockState(h.getBlockState(TARGET));
+                h.assertTrue(AuthorityBreakExecutor.execute(p,prepared(h,p),()->true)==Outcome.EXECUTED,"Execute real break before world receipt");
                 ledger.advance(id,Stage.WORLD_EXECUTED,null);
                 CompoundTag result=new CompoundTag();result.putInt("schema",1);
+                result.putString("dimension",h.getLevel().dimension().location().toString());
+                result.putLong("position",h.absolutePos(TARGET).asLong());
+                result.putLong("inventoryRevision",0);result.putInt("slot",0);
+                result.put("beforeTool",beforeTool);result.put("beforeBlock",beforeBlock);
                 result.put("afterTool",p.getMainHandItem().save(h.getLevel().registryAccess()));
                 result.put("afterBlock",NbtUtils.writeBlockState(h.getBlockState(TARGET)));
                 ListTag drops=new ListTag();for(var drop:events.drops){CompoundTag tag=new CompoundTag();drop.save(tag);drops.add(tag);}

@@ -43,13 +43,18 @@ public final class AuthorityResultJournalSelfTest {
             rejects(()->new AuthorityResultJournal(path,cluster,"wrong-cell"));
             rejects(()->new AuthorityResultJournal(path,UUID.randomUUID(),"cell-0"));
             byte[] good=Files.readAllBytes(path);
-            for(byte[] tail:List.of(new byte[]{0,0}, ByteBuffer.allocate(7).putInt(20).put(new byte[]{1,2,3}).array())) {
+            for(byte[] tail:List.of(new byte[]{0,0}, ByteBuffer.allocate(7).putInt(20).put(new byte[]{1,2,3}).array(),
+                ByteBuffer.allocate(15).putInt(0x46434A31).putInt(20).putInt(~20).put(new byte[]{1,2,3}).array())) {
                 Files.write(path,good); Files.write(path,tail,StandardOpenOption.APPEND);
                 try(var journal=new AuthorityResultJournal(path,cluster,"cell-0")) {
                     check(journal.retained().size()==2,"Incomplete tail retains both results");
                     check(Files.size(path)==good.length,"Incomplete tail truncated");
                 }
             }
+            byte[] badHeader=good.clone();ByteBuffer.wrap(badHeader).putInt(4,good.length+100);
+            Files.write(path,badHeader);
+            rejects(()->new AuthorityResultJournal(path,cluster,"cell-0"));
+            check(Arrays.equals(Files.readAllBytes(path),badHeader),"Corrupt length is not mistaken for a torn append");
             Files.write(path,good);byte[] corrupt=good.clone();corrupt[20]^=1;Files.write(path,corrupt);
             rejects(()->new AuthorityResultJournal(path,cluster,"cell-0"));
             check(Arrays.equals(Files.readAllBytes(path),corrupt),"Complete corrupt record never silently truncated");

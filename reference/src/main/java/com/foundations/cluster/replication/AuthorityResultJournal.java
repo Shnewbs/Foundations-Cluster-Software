@@ -17,6 +17,7 @@ import com.foundations.cluster.replication.PlayerOperationLedger.Result;
  * No compaction is permitted until a coherent checkpoint implementation exists.
  */
 public final class AuthorityResultJournal implements AutoCloseable {
+    private static final int MAGIC = 0x46434A31; // FCJ1; length and complement protect torn/corrupt framing.
     private static final int LIMIT = 2 * 1024 * 1024;
     public record DurableResult(OperationId id, String cell, long epoch, long frame,
                                 String digest, byte[] payload) {
@@ -66,7 +67,7 @@ public final class AuthorityResultJournal implements AutoCloseable {
         byte[] encoded = encode(result);
         result = withDigest(result, encoded);
         CRC32C crc = new CRC32C(); crc.update(encoded);
-        ByteBuffer record = ByteBuffer.allocate(encoded.length + 8).putInt(encoded.length).put(encoded).putInt((int)crc.getValue());
+        ByteBuffer record = ByteBuffer.allocate(encoded.length + 16).putInt(MAGIC).putInt(encoded.length).putInt(~encoded.length).put(encoded).putInt((int)crc.getValue());
         record.flip();
         try {
             channel.position(channel.size());
@@ -90,12 +91,13 @@ public final class AuthorityResultJournal implements AutoCloseable {
     private void replay() throws IOException {
         long offset = 0, size = channel.size();
         while (offset < size) {
-            if (size - offset < 4) { truncate(offset); break; }
-            ByteBuffer header = ByteBuffer.allocate(4); read(header, offset); header.flip();
-            int length = header.getInt();
+            if (size - offset < 12) { truncate(offset); break; }
+            ByteBuffer header = ByteBuffer.allocate(12); read(header, offset); header.flip();
+            int magic = header.getInt(), length = header.getInt(), inverse = header.getInt();
+            if (magic != MAGIC || inverse != ~length) throw new IOException("Corrupt authority record header");
             if (length < 1 || length > LIMIT) throw new IOException("Corrupt authority record length");
-            if (size - offset < length + 8L) { truncate(offset); break; }
-            ByteBuffer record = ByteBuffer.allocate(length + 4); read(record, offset + 4); record.flip();
+            if (size - offset < length + 16L) { truncate(offset); break; }
+            ByteBuffer record = ByteBuffer.allocate(length + 4); read(record, offset + 12); record.flip();
             byte[] data = new byte[length]; record.get(data);
             CRC32C crc = new CRC32C(); crc.update(data);
             if (record.getInt() != (int)crc.getValue()) throw new IOException("Corrupt authority record checksum");
@@ -103,7 +105,7 @@ public final class AuthorityResultJournal implements AutoCloseable {
             if (!cluster.equals(r.id.cluster()) || !cell.equals(r.cell) || r.epoch < lastEpoch ||
                     r.frame != lastFrame + 1 || results.containsKey(r.id)) throw new IOException("Invalid authority record identity/order");
             publish(withDigest(r, data));
-            offset += length + 8L;
+            offset += length + 16L;
         }
     }
     private void truncate(long offset) throws IOException { channel.truncate(offset); channel.force(true); }
