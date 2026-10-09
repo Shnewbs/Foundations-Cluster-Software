@@ -95,6 +95,11 @@ public final class InventoryImageCodec {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
             root = NbtIo.read(in, NbtAccounter.create(16L * 1024 * 1024));
             if (root == null || in.available() != 0) throw new IOException("Trailing or missing inventory NBT");
+        } catch (RuntimeException ex) {
+            // Minecraft wraps some truncated/depth/quota failures in runtime reports.
+            // Keep malformed persisted/network data within the adapter's checked
+            // failure boundary; no player inventory has been touched here.
+            throw new IOException("Invalid inventory NBT", ex);
         }
         if (!root.getAllKeys().equals(Set.of("schema", "selected", "slots")) || !root.contains("schema", Tag.TAG_INT) ||
                 root.getInt("schema") != 1 || !root.contains("selected", Tag.TAG_INT) || !root.contains("slots", Tag.TAG_LIST))

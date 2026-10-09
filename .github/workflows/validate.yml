@@ -137,6 +137,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/feature/0.0.7a-survival-foundation" --jq '.object.sha')
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo 'A newer development candidate exists; keep this run as evidence only.'
+            exit 0
+          fi
           if gh release view v0.0.7a-dev.1 >/dev/null 2>&1; then
             echo 'Existing development release is immutable; assets not replaced.'
           else

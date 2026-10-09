@@ -66,7 +66,15 @@ public final class AnchorInventorySession {
         var after = InventoryImageCodec.decode(delta.after, player.serverLevel().registryAccess());
         if (!before.sameExceptSlot(after, delta.slot)) throw new IllegalArgumentException("Delta changed unreserved slots/selection");
         if (journal.applied(delta.id).isPresent()) {
-            return journal.commit(epoch, delta.id, durableWorldReceipt, delta.after).newCommit();
+            var duplicate = journal.commit(epoch, delta.id, durableWorldReceipt, delta.after);
+            // A reopened session may still hold pre-crash inventory. Dedup alone is
+            // not proof that the durable image reached memory. Never publish an
+            // old delta over newer inventory; require explicit latest-image restore.
+            if (!Arrays.equals(live(), view.image())) {
+                needsRestore = true;
+                throw new IllegalStateException("Durable inventory has not been restored; explicit restore required");
+            }
+            return duplicate.newCommit();
         }
         if (view.pending() == null || !view.pending().id().equals(delta.id) || view.pending().slot() != delta.slot ||
                 view.revision() != delta.beforeRevision || !Arrays.equals(view.image(), delta.before) || !Arrays.equals(live(), delta.before))

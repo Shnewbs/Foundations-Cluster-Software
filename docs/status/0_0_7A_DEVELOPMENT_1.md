@@ -20,6 +20,8 @@ baseline. Existing runtime version markers and remote Survival gates are unchang
 - AnchorInventorySession: actual Minecraft selected/offhand slot delta preparation,
   reservation revalidation, durable commit before memory publication, explicit restore,
   epoch fencing and idempotent application. Publication failure fences the session.
+  Even duplicate results require the latest durable inventory to be present in memory;
+  a reopened session cannot use dedup to bypass required restoration.
 - ChunkSaveFence: validates coordinates and the exact expected applied-operation
   attachment in the actual ChunkSerializer output. Missing/altered markers are not
   accepted as checkpoint evidence. A deliberately failing registered codec exercises
@@ -34,16 +36,18 @@ Local Java 21/Linux: full portable validation passed, including 1,887 new invent
 journal checks and four forcibly terminated JVMs. Existing Manager, UI, HTTP and
 reference recovery suites also passed. CI must verify the exact pushed candidate.
 
-The source adds 12 real NeoForge inventory GameTests and two additional chunk-save
-GameTests, retaining the original 20 (34 total). They cover actual break/placement
-paths, last-use tool consumption, full inventory restore, later-change preservation,
+The source adds 13 NeoForge inventory GameTests and two additional chunk-save tests,
+retaining the original 20 (35 total). Tests cover actual break/placement paths,
+last-use tool consumption, full inventory restore, later-change preservation,
 held-slot/component conflicts, offhand/empty stacks, stale anchors, malformed final
-slots, unreserved grants, transient components and serializer omission. GameTest
-results are published only after actual execution; consult the exact commit's CI.
+slots, unreserved grants, transient components, reopened-session publication and
+serializer omission. Results are evidence only after actual execution; consult CI.
 
 All game actors have synthetic identities and are never connected clients. A
 reopened journal/new epoch in the same GameTest is not a real worker migration.
 Journal-process termination is not Minecraft worker termination or sudden power loss.
+The publication-only regression uses a synthetic receipt explicitly; break/placement
+fixtures separately use the actual forced AuthorityResultJournal with result NBT.
 No real user world, inventory, profile, credentials or active configuration is used.
 
 ## Scope and restrictions
