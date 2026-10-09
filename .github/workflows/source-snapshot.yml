@@ -1,0 +1,28 @@
+name: Source snapshot
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Archive only committed source, never workspaces or credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source-artifact
+          git archive --format=zip --prefix=FoundationsCluster-source/ --output="source-artifact/FoundationsCluster-${GITHUB_SHA}-SOURCE.zip" HEAD
+          (cd source-artifact && sha256sum *.zip > SHA256SUMS.txt)
+          printf '%s\n' "$GITHUB_SHA" > source-artifact/COMMIT.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: exact-source
+          path: source-artifact/*
+          if-no-files-found: error
+          retention-days: 14
