@@ -35,15 +35,24 @@ public final class InventoryRecoveryGameTests {
             try(var journal=new PlayerInventoryJournal(root.resolve("inventory"),cluster,player.getUUID())) {
                 journal.claim(2);var resumed=new AnchorInventorySession(player,journal,2);
                 boolean rejected=false;
+                try { resumed.recordLocalChange(); } catch(IllegalStateException expected) { rejected=true; }
+                h.assertTrue(rejected&&journal.view().revision()==2,"Fresh session cannot record stale memory before any retry");
+                rejected=false;
+                try { resumed.inventoryMutationAllowed(); } catch(IllegalStateException expected) { rejected=true; }
+                h.assertTrue(rejected,"Fresh session cannot authorize mutations before restore");
+                rejected=false;
                 try { resumed.apply(delta,receipt); } catch(IllegalStateException expected) { rejected=true; }
                 h.assertTrue(rejected,"Dedup must not report completion before memory restoration");
                 h.assertTrue(player.getInventory().getItem(0).isEmpty(),"Failed retry does not auto-overwrite memory");
-                rejected=false;
-                try { resumed.recordLocalChange(); } catch(IllegalStateException expected) { rejected=true; }
-                h.assertTrue(rejected,"Missing publication fences local changes until explicit restore");
                 resumed.restore();
                 h.assertTrue(player.getInventory().getItem(0).getCount()==1&&player.getInventory().getItem(9).getCount()==17,"Restore uses newest image, never old delta");
                 h.assertTrue(!resumed.apply(delta,receipt)&&journal.view().revision()==2,"Retry remains idempotent after explicit restore");
+                player.getInventory().clearContent();
+                rejected=false;
+                try { resumed.apply(delta,receipt); } catch(IllegalStateException expected) { rejected=true; }
+                h.assertTrue(rejected,"Established-session duplicate also detects unpublished state");
+                resumed.restore();
+                h.assertTrue(player.getInventory().getItem(9).getCount()==17,"Repeated recovery preserves later inventory state");
             }
         } finally {
             player.getAdvancements().stopListening();

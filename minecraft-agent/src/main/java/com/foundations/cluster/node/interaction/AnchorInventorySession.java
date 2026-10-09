@@ -26,7 +26,10 @@ public final class AnchorInventorySession {
     private boolean needsRestore;
     public AnchorInventorySession(ServerPlayer player, PlayerInventoryJournal journal, long epoch) throws IOException {
         this.player = Objects.requireNonNull(player); this.journal = Objects.requireNonNull(journal); this.epoch = epoch;
-        check();
+        View initial = check();
+        // A newly created session cannot bless pre-recovery memory as a new local
+        // observation. All mutation/receipt APIs stay fenced until explicit restore.
+        needsRestore = !Arrays.equals(live(), initial.image());
     }
     private View check() throws IOException {
         InventoryImageCodec.requireLocalInventory(player);
@@ -67,9 +70,8 @@ public final class AnchorInventorySession {
         if (!before.sameExceptSlot(after, delta.slot)) throw new IllegalArgumentException("Delta changed unreserved slots/selection");
         if (journal.applied(delta.id).isPresent()) {
             var duplicate = journal.commit(epoch, delta.id, durableWorldReceipt, delta.after);
-            // A reopened session may still hold pre-crash inventory. Dedup alone is
-            // not proof that the durable image reached memory. Never publish an
-            // old delta over newer inventory; require explicit latest-image restore.
+            // Dedup is not proof that the durable image reached memory. Never
+            // publish an old delta over newer inventory; restore the latest image.
             if (!Arrays.equals(live(), view.image())) {
                 needsRestore = true;
                 throw new IllegalStateException("Durable inventory has not been restored; explicit restore required");
