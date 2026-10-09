@@ -59,8 +59,11 @@ public final class PlayerLedgerRecoverySelfTest {
             Files.write(torn, Arrays.copyOf(complete, prefix.length + cut));
             try (var ledger = open(torn)) {
                 check(ledger.get(id()).stage() == Stage.PREPARED, "partial frame must not publish a transition");
-                check(Arrays.equals(Files.readAllBytes(torn), prefix), "only interrupted tail is removed");
                 check(ledger.slotReserved(0), "durable reservation retained after interrupted frame");
+            }
+            // Windows denies reads through a second handle while the journal holds its lock.
+            check(Arrays.equals(Files.readAllBytes(torn), prefix), "only interrupted tail is removed");
+            try (var ledger = open(torn)) {
                 ledger.advance(id(), Stage.ABORTED, null);
                 check(ledger.prepare(SLOT).id().counter() == 1, "counter preserved after tail repair");
             }
@@ -99,7 +102,9 @@ public final class PlayerLedgerRecoverySelfTest {
         Path path = root.resolve("legacy-mixed"); Files.write(path, legacy);
         try (var ledger = open(path)) {
             check(ledger.get(id()).stage() == Stage.PREPARED, "complete HF15 legacy record remains readable");
-            check(Arrays.equals(legacy, Files.readAllBytes(path)), "opening legacy data does not rewrite it");
+        }
+        check(Arrays.equals(legacy, Files.readAllBytes(path)), "opening legacy data does not rewrite it");
+        try (var ledger = open(path)) {
             ledger.advance(id(), Stage.WORLD_EXECUTED, null);
         }
         byte[] mixed = Files.readAllBytes(path);
