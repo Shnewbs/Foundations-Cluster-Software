@@ -11,6 +11,9 @@ import java.util.zip.CRC32C;
 
 /** Spike A only: durable protocol model, not a Minecraft inventory/world adapter.
  * One journal belongs to one cluster/player. force() precedes publication of state.
+ * New records protect their length with a magic and complement. Complete legacy
+ * records remain readable in place; ambiguous legacy tails fail closed without
+ * truncation. No migration rewrites existing records.
  * Production group commit and coherent chunk/entity checkpoints remain spike gates.
  */
 public final class PlayerOperationLedger implements AutoCloseable {
@@ -39,6 +42,7 @@ public final class PlayerOperationLedger implements AutoCloseable {
         }
     }
     public record Operation(OperationId id, Reservation reservation, Stage stage, Result result) {}
+    private static final int RECORD_MAGIC = 0x46435032; // FCP2 framing; payload schema remains 1.
     private static final int MAX_RECORD_BYTES = 65536;
     private final UUID cluster, player;
     private final FileChannel channel;
@@ -59,13 +63,16 @@ public final class PlayerOperationLedger implements AutoCloseable {
             lock = acquired;
             replay();
         } catch (IOException | RuntimeException e) {
-            if (acquired != null) acquired.release();
-            channel.close();
+            try { if (acquired != null) acquired.release(); }
+            catch (IOException cleanup) { e.addSuppressed(cleanup); }
+            try { channel.close(); }
+            catch (IOException cleanup) { e.addSuppressed(cleanup); }
             throw e;
         }
     }
 
     public synchronized Operation prepare(Reservation reservation) throws IOException {
+        available();
         Objects.requireNonNull(reservation);
         if (nextCounter == Long.MAX_VALUE) throw new IllegalStateException("Operation counter exhausted");
         for (Operation op : operations.values())
@@ -78,6 +85,7 @@ public final class PlayerOperationLedger implements AutoCloseable {
     }
 
     public synchronized Operation advance(OperationId id, Stage stage, Result result) throws IOException {
+        available();
         Operation old = get(id);
         Objects.requireNonNull(stage);
         if (old.stage == stage && Objects.equals(old.result, result)) return old;
@@ -98,6 +106,7 @@ public final class PlayerOperationLedger implements AutoCloseable {
     /** The replica adapter must supply its actually applied cell/epoch/frame, not an observed remote head. */
     public synchronized Operation acknowledge(OperationId id, String cell, long epoch, long appliedFrame)
             throws IOException {
+        available();
         Operation old = get(id);
         if (old.stage != Stage.PLAYER_COMMITTED && old.stage != Stage.CLIENT_ACKED)
             throw new IllegalStateException("Player delta not committed");
@@ -111,6 +120,8 @@ public final class PlayerOperationLedger implements AutoCloseable {
     }
 
     public synchronized Operation get(OperationId id) {
+        readable();
+        Objects.requireNonNull(id);
         if (!cluster.equals(id.cluster) || !player.equals(id.player))
             throw new IllegalArgumentException("Wrong cluster/player");
         Operation op = operations.get(id.counter);
@@ -118,10 +129,12 @@ public final class PlayerOperationLedger implements AutoCloseable {
         return op;
     }
     public synchronized List<Operation> unfinished() {
+        readable();
         return operations.values().stream().filter(o -> o.stage != Stage.ABORTED &&
             o.stage != Stage.CLIENT_ACKED).toList();
     }
     public synchronized boolean slotReserved(int slot) {
+        readable();
         return operations.values().stream().anyMatch(o -> reserved(o) && o.reservation.slot == slot);
     }
     private static boolean reserved(Operation o) {
@@ -129,13 +142,22 @@ public final class PlayerOperationLedger implements AutoCloseable {
             o.stage == Stage.WORLD_RESULT_DURABLE;
     }
 
+    private void available() throws IOException {
+        if (failed || !channel.isOpen() || !lock.isValid())
+            throw new IOException("Ledger unavailable; reopen for recovery");
+    }
+    private void readable() {
+        if (failed || !channel.isOpen() || !lock.isValid())
+            throw new IllegalStateException("Ledger unavailable; reopen for recovery");
+    }
     private void append(Operation op) throws IOException {
-        if (failed || !channel.isOpen()) throw new IOException("Ledger unavailable; reopen for recovery");
+        available();
         byte[] payload = encode(op);
         if (payload.length > MAX_RECORD_BYTES) throw new IOException("Record limit exceeded");
         CRC32C crc = new CRC32C(); crc.update(payload);
-        ByteBuffer bytes = ByteBuffer.allocate(payload.length + 8);
-        bytes.putInt(payload.length).put(payload).putInt((int) crc.getValue()).flip();
+        ByteBuffer bytes = ByteBuffer.allocate(payload.length + 16);
+        bytes.putInt(RECORD_MAGIC).putInt(payload.length).putInt(~payload.length)
+            .put(payload).putInt((int) crc.getValue()).flip();
         try {
             channel.position(channel.size());
             while (bytes.hasRemaining()) channel.write(bytes);
@@ -147,13 +169,46 @@ public final class PlayerOperationLedger implements AutoCloseable {
 
     private void replay() throws IOException {
         long offset = 0, size = channel.size();
+        boolean protectedSeen = false;
         while (offset < size) {
-            if (size - offset < 4) { truncateTail(offset); break; }
-            ByteBuffer header = ByteBuffer.allocate(4); readFully(header, offset); header.flip();
-            int length = header.getInt();
-            if (length <= 0 || length > MAX_RECORD_BYTES) throw new IOException("Corrupt ledger length");
-            if (size - offset < length + 8L) { truncateTail(offset); break; }
-            ByteBuffer body = ByteBuffer.allocate(length + 4); readFully(body, offset + 4); body.flip();
+            long remaining = size - offset;
+            if (remaining < 4) {
+                // Only a prefix of our protected magic is a repairable new-frame tail.
+                // A short legacy length cannot be distinguished from corrupt framing.
+                ByteBuffer prefix = ByteBuffer.allocate((int) remaining);
+                readFully(prefix, offset);
+                byte[] magic = ByteBuffer.allocate(4).putInt(RECORD_MAGIC).array();
+                for (int i = 0; i < remaining; i++)
+                    if (prefix.array()[i] != magic[i]) throw new IOException("Ambiguous ledger tail; original preserved");
+                truncateTail(offset); break;
+            }
+            ByteBuffer first = ByteBuffer.allocate(4); readFully(first, offset); first.flip();
+            int word = first.getInt(), length, headerSize;
+            boolean protectedFrame = word == RECORD_MAGIC;
+            if (protectedFrame) {
+                protectedSeen = true;
+                int headerBytes = (int) Math.min(remaining, 12);
+                ByteBuffer header = ByteBuffer.allocate(headerBytes); readFully(header, offset); header.flip();
+                header.getInt();
+                if (headerBytes < 8) { truncateTail(offset); break; }
+                length = header.getInt();
+                if (length <= 0 || length > MAX_RECORD_BYTES) throw new IOException("Corrupt ledger length");
+                byte[] inverse = ByteBuffer.allocate(4).putInt(~length).array();
+                for (int i = 0; header.hasRemaining(); i++)
+                    if (header.get() != inverse[i]) throw new IOException("Corrupt ledger record header");
+                if (headerBytes < 12) { truncateTail(offset); break; }
+                headerSize = 12;
+            } else {
+                if (protectedSeen || word <= 0 || word > MAX_RECORD_BYTES)
+                    throw new IOException("Corrupt ledger framing");
+                length = word; headerSize = 4;
+            }
+            long recordSize = headerSize + length + 4L;
+            if (remaining < recordSize) {
+                if (!protectedFrame) throw new IOException("Incomplete legacy ledger record; original preserved");
+                truncateTail(offset); break;
+            }
+            ByteBuffer body = ByteBuffer.allocate(length + 4); readFully(body, offset + headerSize); body.flip();
             byte[] payload = new byte[length]; body.get(payload);
             CRC32C crc = new CRC32C(); crc.update(payload);
             if (body.getInt() != (int) crc.getValue()) throw new IOException("Corrupt ledger checksum");
@@ -164,7 +219,7 @@ public final class PlayerOperationLedger implements AutoCloseable {
             validateReplay(op);
             operations.put(op.id.counter, op);
             nextCounter = Math.max(nextCounter, op.id.counter + 1);
-            offset += length + 8L;
+            offset += recordSize;
         }
     }
     private void validateReplay(Operation op) throws IOException {
@@ -219,6 +274,6 @@ public final class PlayerOperationLedger implements AutoCloseable {
         } catch (IllegalArgumentException e) { throw new IOException("Invalid ledger record", e); }
     }
     @Override public synchronized void close() throws IOException {
-        try { lock.release(); } finally { channel.close(); }
+        try { if (lock.isValid()) lock.release(); } finally { channel.close(); }
     }
 }
