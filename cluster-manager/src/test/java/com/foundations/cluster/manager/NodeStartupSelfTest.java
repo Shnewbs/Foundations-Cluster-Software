@@ -21,7 +21,7 @@ public final class NodeStartupSelfTest {
   Properties build=new Properties();try(var in=Files.newInputStream(Path.of(args[0],"minecraft-agent/gradle.properties"))){build.load(in);}
   check(ClusterVersion.NODE_VERSION.equals(build.getProperty("mod_version")),"Manager/Gradle release parity");
   check(ClusterVersion.NODE_VERSION.equals("0.0.6a.R14"),"R14 required");
-  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.6a.R19-HF15"),"repair package marker");
+  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.6a.R19-HF16"),"repair package marker");
   Path home=Files.createTempDirectory("foundations-nodefix-");
   try{
    Files.createDirectories(home.resolve("config"));Files.writeString(home.resolve("config/cluster.properties"),"worker.templateDir=custom template\nworld.seed=1234\nworld.identity.enforce=false\nworld.environment.enabled=false\n");
@@ -31,14 +31,14 @@ public final class NodeStartupSelfTest {
    check(!node.ready()&&node.state().equals("MISSING"),"missing Node blocks startup");
    jar(mods.resolve(old),"0.0.6a.R11");jar(cache.resolve(old),"0.0.6a.R11");
    check(node.state().equals("OUTDATED"),"R11 template is outdated");
-   check(node.builtJar()==null,"R11 cache is not R13");
-   jar(cache.resolve(current),"0.0.6a.R11");check(node.builtJar()==null,"R11 renamed to R13 rejected");
+   check(node.builtJar()==null,"R11 cache is not R14");
+   jar(cache.resolve(current),"0.0.6a.R11");check(node.builtJar()==null,"R11 renamed to R14 rejected");
    try{node.installBuiltJarIfPresent();throw new AssertionError("invalid artifact accepted");}catch(IOException e){check(e.getMessage().contains("Expected Cluster Node 0.0.6a.R14")&&e.getMessage().contains("embedded Node version is 0.0.6a.R11"),"specific wrong-metadata diagnostic");}
    check(Files.exists(mods.resolve(old)),"failed preflight preserves installed old Node");
    Files.writeString(cache.resolve(current),"broken zip");check(node.builtJar()==null,"corrupt artifact rejected");
    jar(cache.resolve(current),"0.0.6a.R14");check(node.mayAutoRetry(),"valid build usable without Gradle/script");
    node.buildAndInstallAsync();waitFor(node);
-   check(node.ready()&&node.state().equals("READY"),"R13 satisfies startup");
+   check(node.ready()&&node.state().equals("READY"),"R14 satisfies startup");
    check(node.installedJar().equals(mods.resolve(current)),"configured template used");
    check(!Files.exists(home.resolve("server-template")),"default template not created with custom config");
    check(!Files.exists(mods.resolve(old)),"old template duplicate removed");
