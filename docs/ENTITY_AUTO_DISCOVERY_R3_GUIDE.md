@@ -2,7 +2,7 @@
 
 **Build:** `0.0.7a-dev.2.R3`; **Node:** `0.0.6a.R17`; Minecraft 1.21.1, NeoForge 21.1.250.
 
-This development build removes **manual pairing for automatically supported entities**. It **does not** implement full ownership transfer or generic modded entity replication. Auto-discovery is deliberately **OFF** until an operator enables it, so the first connected-client verification cannot unexpectedly alter every viewer's packets.
+This development build removes **manual pairing for automatically supported entities**. It **does not** implement full ownership transfer or generic modded entity replication. Automatic source-side discovery defaults **ON** for supported loaded cows and dropped items, while **remote viewing remains OFF** until a connected operator explicitly runs `/foundations_entities view on`. An operator can stop discovery on A with `/foundations_entities auto off`; that switch is not persistent across restart.
 
 ## Installation
 
@@ -15,14 +15,13 @@ This development build removes **manual pairing for automatically supported enti
 
 Run two workers with the same cluster world identity, modpack, dimension and compatible registry setup. Use an isolated copied world with at least one region ACTIVE and hydrated on worker A. A should be able to tick the already loaded cow/item. If both layers have independent native animals in the same location, keep them identified separately; R3 never deletes or merges native UUIDs.
 
-On **source worker A**, join as an operator and enter:
+On **source worker A**, join as an operator and check:
 
 ```text
-/foundations_entities auto on
 /foundations_entities status
 ```
 
-No `/foundations_entities pair` command is needed. This one switch enables recurring interest-driven discovery on that worker until it restarts or you turn it off.
+Auto-discovery is already enabled on a fresh R3 worker; no `/foundations_entities pair` or `auto on` command is required. If you previously ran `auto off`, use `/foundations_entities auto on` to resume discovery. Viewing remains separately permissioned and opt-in on the destination.
 
 On **destination worker B**, join as an operator, stand in the same dimension near the source cow's canonical world coordinates, then enter:
 
@@ -37,6 +36,8 @@ The Manager tells the source where opted-in remote viewers are. The source scans
 /foundations_entities auto off
 /foundations_entities view off
 ```
+
+`auto off` is a source-side emergency/debug switch; a new server process resets auto-discovery to ON. `view off` revokes this connected player's remote preview consent.
 
 Run `/foundations_entities status` on both workers and, if needed, the Manager `/api/entity-views/status` page (administrator access). Send outputs, any pairing/UUID collision diagnostic, and the approximate location/dimension of a mismatch. Prefer a screen recording for the already-observed transition hitch; packet preview experiments do **not** prove smooth client transitions.
 

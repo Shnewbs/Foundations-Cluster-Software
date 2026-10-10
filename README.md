@@ -2,7 +2,7 @@
 
 Minecraft **1.21.1** / NeoForge **21.1.250** development build.
 
-**Automatic preview discovery (new):** Instead of pairing individual cows and dropped items, a connected operator may enable `/foundations_entities auto on` on their authoritative source worker. Compatible destination viewers opt in with `/foundations_entities view on`. Node observes only **already-loaded** and **currently authoritative** native cows/items, and the Manager validates region ownership before relaying exact-UUID, dimension, position, movement and synced visual state. No destination gameplay entity is created. Manual pair commands remain for debugging.
+**Automatic preview discovery (new):** Instead of pairing individual cows and dropped items, authoritative source workers automatically scan relevant loaded entities near consenting viewers; a connected operator can suspend source discovery with `/foundations_entities auto off` or resume it with `auto on`. Compatible destination viewers must independently opt in with `/foundations_entities view on`. Node observes only **already-loaded** and **currently authoritative** native cows/items, and the Manager validates region ownership before relaying exact-UUID, dimension, position, movement and synced visual state. No destination gameplay entity is created. Manual pair commands remain for debugging.
 
 **Not full 7a or generic entity replication.** Off-layer Survival breaking, entity ownership transfer, inventory-authoritative pickup, generic modded entity support, crash-safe transfer and visually seamless backend switching remain unproven/disabled. A brief client-visible transition pause remains possible; this release does not claim to optimize it. Current state is source-bound presentation only.
 
