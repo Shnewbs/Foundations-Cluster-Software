@@ -4,7 +4,7 @@ on:
     branches:
       - feature/0.0.7a-survival-foundation
     paths:
-      - '.r4-stage/patch.xz'
+      - '.r4-stage/**'
 permissions:
   contents: write
 jobs:
@@ -21,14 +21,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = '7b4b3a00bfea0b46e45fedffe7ccda515c6a84ec'
+          test -f .r4-stage/patch.xz
           echo '79c27f2b10aca990862abd2a2323b94596cb32f656d94b382ea65bfdb4df3e6d  .r4-stage/patch.xz' | sha256sum -c -
           xz -dc .r4-stage/patch.xz > "$RUNNER_TEMP/r4.patch"
           echo '40b54b8bafd282519e03c79953f94f52f456da82db723d5094c9a780c9e0170a  '"$RUNNER_TEMP/r4.patch" | sha256sum -c -
-          git apply --check "$RUNNER_TEMP/r4.patch"
-          git apply "$RUNNER_TEMP/r4.patch"
-          rm -rf .r4-stage
-          rm .github/workflows/apply-r4-source.yml
+          git apply --check --exclude=.github/workflows/validate.yml "$RUNNER_TEMP/r4.patch"
+          git apply --exclude=.github/workflows/validate.yml "$RUNNER_TEMP/r4.patch"
           git add -A
           git diff --cached --check
           git config user.name 'Foundations CI'
