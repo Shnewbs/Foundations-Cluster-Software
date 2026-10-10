@@ -38,39 +38,58 @@ public final class EntityViewGameTests {
     }
     private static long count(ServerLevel level){long n=0;for(Entity ignored:level.getAllEntities())n++;return n;}
     @GameTest(template="empty") public static void autoEntityDiscoveryFindsLoadedCowWithoutPair(GameTestHelper h)throws Exception {
-        var c=cow(h);h.getLevel().addFreshEntity(c);
-        long count=count(h.getLevel());
-        var viewer=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
-        var data=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(viewer),Set.of(),e->true,4);
-        h.assertTrue(data.states().size()==1&&data.states().getFirst().entity().equals(c.getUUID()),"Loaded native cow discovered without manual pair");
-        h.assertTrue(data.states().getFirst().binding().equals(com.foundations.cluster.protocol.EntityViewsWire.autoBinding("worker-001",c.getUUID())),"Auto binding stable from worker/UUID");
-        h.assertTrue(count(h.getLevel())==count && !c.isRemoved(),"No entity created, removed or modified by discovery");h.succeed();
+        var c=cow(h);h.assertTrue(h.getLevel().addFreshEntity(c),"Cow fixture is admitted to the real world");
+        // Fresh entities only enter the native spatial index after the entity-tick pass.
+        h.runAfterDelay(2,()->{
+            var viewer=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
+            long before=count(h.getLevel());
+            var data=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(viewer),Set.of(),e->e.getUUID().equals(c.getUUID()),4);
+            h.assertTrue(data.states().size()==1&&data.states().getFirst().entity().equals(c.getUUID()),
+                "Loaded cow found by spatial index: results="+data.states().size()+" indexed="+(h.getLevel().getEntity(c.getUUID())==c));
+            h.assertTrue(data.states().getFirst().binding().equals(com.foundations.cluster.protocol.EntityViewsWire.autoBinding("worker-001",c.getUUID())),"Auto UUID stable from worker/UUID");
+            h.assertTrue(count(h.getLevel())==before&&!c.isRemoved(),"Discovery cannot spawn, remove or mutate live entities");h.succeed();
+        });
     }
     @GameTest(template="empty") public static void autoEntityDiscoveryEnforcesAuthorityAndDistance(GameTestHelper h)throws Exception {
-        var c=cow(h);h.getLevel().addFreshEntity(c);
-        var origin=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
-        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(),e->false,4).states().isEmpty(),"Unowned entities never sent");
-        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(c.getUUID()),e->true,4).states().isEmpty(),"Manual pairing takes precedence");
-        var far=new Player(UUID.randomUUID(),"Far","minecraft:overworld",c.getX()+1000,c.getY(),c.getZ());
-        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(far),Set.of(),e->true,4).states().isEmpty(),"Far entity is not disclosed");
-        var other=new Player(UUID.randomUUID(),"Dimension","minecraft:the_nether",c.getX(),c.getY(),c.getZ());
-        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(other),Set.of(),e->true,4).states().isEmpty(),"Dimension isolation");h.succeed();
+        var c=cow(h);h.assertTrue(h.getLevel().addFreshEntity(c),"Authority fixture cow admitted");
+        h.runAfterDelay(2,()->{
+            var origin=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
+            h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(),e->e.getUUID().equals(c.getUUID()),4).states().size()==1,"Positive source-index control");
+            h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(),e->false,4).states().isEmpty(),"Unowned entities never sent");
+            h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(c.getUUID()),e->true,4).states().stream().noneMatch(s->s.entity().equals(c.getUUID())),"Manual pairing takes precedence");
+            var far=new Player(UUID.randomUUID(),"Far","minecraft:overworld",c.getX()+1000,c.getY(),c.getZ());
+            h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(far),Set.of(),e->e.getUUID().equals(c.getUUID()),4).states().isEmpty(),"Far entity is not disclosed");
+            var other=new Player(UUID.randomUUID(),"Dimension","minecraft:the_nether",c.getX(),c.getY(),c.getZ());
+            h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(other),Set.of(),e->e.getUUID().equals(c.getUUID()),4).states().isEmpty(),"Dimension isolation");h.succeed();
+        });
     }
     @GameTest(template="empty") public static void autoEntityDiscoveryDoesNotPairUnsupportedPig(GameTestHelper h)throws Exception {
-        var c=cow(h);h.getLevel().addFreshEntity(c);
-        var pig=EntityType.PIG.create(h.getLevel());pig.setPos(c.getX()+1,c.getY(),c.getZ());h.getLevel().addFreshEntity(pig);
-        var center=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
-        var views=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(center),Set.of(),e->true,4);
-        h.assertTrue(views.states().size()==1&&views.states().getFirst().entity().equals(c.getUUID()),"Unsupported entity type stays untouched/unpaired");
-        h.assertTrue(h.getLevel().getEntity(pig.getUUID())==pig,"Pig stays a normal independent native entity");h.succeed();
+        var c=cow(h);h.assertTrue(h.getLevel().addFreshEntity(c),"Cow fixture admitted");
+        var pig=EntityType.PIG.create(h.getLevel());pig.setPos(c.getX()+1,c.getY(),c.getZ());h.assertTrue(h.getLevel().addFreshEntity(pig),"Pig fixture admitted");
+        var fixtures=Set.of(c.getUUID(),pig.getUUID());
+        h.runAfterDelay(2,()->{
+            var center=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
+            var views=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(center),Set.of(),e->fixtures.contains(e.getUUID()),4);
+            h.assertTrue(views.states().size()==1&&views.states().getFirst().entity().equals(c.getUUID()),
+                "Unsupported pig stays unpaired: actual views="+views.states().size());
+            h.assertTrue(h.getLevel().getEntity(pig.getUUID())==pig,"Pig remains an independent native entity");h.succeed();
+        });
     }
     @GameTest(template="empty") public static void autoEntityDiscoveryBoundedNearestStable(GameTestHelper h)throws Exception {
-        var one=cow(h);h.getLevel().addFreshEntity(one);
-        var two=EntityType.COW.create(h.getLevel());two.setNoAi(true);two.setPos(one.getX()+3,one.getY(),one.getZ());h.getLevel().addFreshEntity(two);
-        var pos=new Player(UUID.randomUUID(),"Observer",one.level().dimension().location().toString(),one.getX(),one.getY(),one.getZ());
-        var a=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(pos),Set.of(),e->true,1);
-        var b=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(pos),Set.of(),e->true,1);
-        h.assertTrue(a.states().size()==1&&a.skipped()>=1&&a.states().equals(b.states()),"Nearest, bounded results stable across scans");h.succeed();
+        var one=cow(h);h.assertTrue(h.getLevel().addFreshEntity(one),"Near cow admitted");
+        var two=EntityType.COW.create(h.getLevel());two.setNoAi(true);two.setPos(one.getX()+3,one.getY(),one.getZ());h.assertTrue(h.getLevel().addFreshEntity(two),"Far cow admitted");
+        var fixtures=Set.of(one.getUUID(),two.getUUID());
+        h.runAfterDelay(2,()->{
+            var pos=new Player(UUID.randomUUID(),"Observer",one.level().dimension().location().toString(),one.getX(),one.getY(),one.getZ());
+            var a=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(pos),Set.of(),e->fixtures.contains(e.getUUID()),1);
+            var b=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(pos),Set.of(),e->fixtures.contains(e.getUUID()),1);
+            // State contains a byte[]; Java record/list equals would compare that array by reference.
+            h.assertTrue(a.states().size()==1&&b.states().size()==1&&a.skipped()==1&&b.skipped()==1,
+                "Two loaded authoritative cows produce one bounded nearest result, not zero");
+            var s=a.states().getFirst(),t=b.states().getFirst();
+            h.assertTrue(s.entity().equals(one.getUUID())&&t.entity().equals(one.getUUID())&&s.binding().equals(t.binding())&&
+                Arrays.equals(s.metadata(),t.metadata()),"Nearest UUID and metadata bytes are stable across scans");h.succeed();
+        });
     }
     @GameTest(template="empty") public static void entityViewCapturePreservesSourceAndDirtyTracker(GameTestHelper h)throws Exception {
         var cow=cow(h);cow.getEntityData().packDirty();cow.setCustomName(Component.literal("R2 cow"));cow.setAge(-1200);cow.setHealth(7);cow.setYRot(90);cow.setXRot(15);cow.setYHeadRot(45);cow.setDeltaMovement(.1,.2,.3);
