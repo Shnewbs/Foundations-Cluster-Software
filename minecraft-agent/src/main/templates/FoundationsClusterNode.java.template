@@ -98,7 +98,7 @@ public final class FoundationsClusterNode {
     private final int remoteTickLimit = Math.max(1, Math.min(1024, parseInt(env("FOUNDATIONS_REMOTE_TICK_LIMIT", "128"), 128)));
     private static final long GROWTH_CONTROL_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(8);
     private static final TicketType<ChunkPos> REMOTE_GROWTH_TICKET = TicketType.create("foundations_remote_growth", Comparator.comparingLong(ChunkPos::toLong));
-    private static final TicketType<String> HANDOFF_PRELOAD_TICKET = TicketType.create("foundations_handoff_preload", Comparator.naturalOrder());
+    private static final TicketType<String> HANDOFF_PRELOAD_TICKET = TicketType.create("foundations_handoff_preload", Comparator.<String>naturalOrder());
     private final HandoffChunkPreloader handoffPreloads = new HandoffChunkPreloader(new HandoffChunkPreloader.Completion() {
         @Override public void ready(String id,int chunks,long elapsedNanos) {
             post("/api/agent/handoff/ready","{\"handoffId\":\""+esc(id)+"\",\"workerId\":\""+esc(workerId)+"\"}");
