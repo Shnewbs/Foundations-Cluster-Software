@@ -146,8 +146,8 @@ jobs:
             echo 'A newer development candidate exists; keep this run as evidence only.'
             exit 0
           fi
-          if gh release view v0.0.7a-dev.2.R3 >/dev/null 2>&1; then
+          if gh release view v0.0.7a-dev.2.R4 >/dev/null 2>&1; then
             echo 'Existing development release is immutable; assets not replaced.'
           else
-            gh release create v0.0.7a-dev.2.R3 development-dist/* --target "$GITHUB_SHA" --prerelease --latest=false --title 'Foundations Cluster 0.0.7a-dev.2.R3 — Automatic entity discovery (display-only)' --notes-file docs/status/0_0_7A_DEV2_R3.md
+            gh release create v0.0.7a-dev.2.R4 development-dist/* --target "$GITHUB_SHA" --prerelease --latest=false --title 'Foundations Cluster 0.0.7a-dev.2.R4 — Vanilla species and recovery-model gates (development)' --notes-file docs/status/0_0_7A_DEV2_R4.md
           fi
