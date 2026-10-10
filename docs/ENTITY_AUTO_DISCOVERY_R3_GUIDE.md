@@ -1,13 +1,13 @@
 # Foundations Cluster — R4 Certified Vanilla Presentation + Recovery Gate Test
 
-**Build:** `0.0.7a-dev.2.R4`; **Node:** `0.0.6a.R18`; Minecraft 1.21.1, NeoForge 21.1.250.
+**Build:** `0.0.7a-dev.2.R5`; **Node:** `0.0.6a.R19`; Minecraft 1.21.1, NeoForge 21.1.250.
 
 This development build removes **manual pairing for automatically supported entities**. It **does not** implement full ownership transfer or generic modded entity replication. Automatic source-side discovery defaults **ON** for supported loaded cows, pigs, sheep, chickens and dropped items, while **remote viewing remains OFF** until a connected operator explicitly runs `/foundations_entities view on`. An operator can stop discovery on A with `/foundations_entities auto off`; that switch is not persistent across restart.
 
 ## Installation
 
 1. Stop the Manager, gateway and **all** workers. Make a complete backup, or use a test copy.
-2. Extract the versioned `FoundationsCluster-0.0.7a-dev.2.R4-UPDATER.zip` away from your install and run `APPLY_UPDATE.bat`. Give it your existing cluster root. Retain the backup directory.
+2. Extract the versioned `FoundationsCluster-0.0.7a-dev.2.R5-UPDATER.zip` away from your install and run `APPLY_UPDATE.bat`. Give it your existing cluster root. Retain the backup directory.
 3. Start normally and confirm **package R4** and **Node R18 on every worker**. Ctrl+F5 refreshes the dashboard. All prior HF16 controls remain.
 4. If a worker is out of date, stop and fix the version mismatch; do not remove world files or force unsupported cross-version replication.
 

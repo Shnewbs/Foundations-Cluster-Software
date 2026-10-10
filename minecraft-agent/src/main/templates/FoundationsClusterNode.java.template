@@ -98,6 +98,17 @@ public final class FoundationsClusterNode {
     private final int remoteTickLimit = Math.max(1, Math.min(1024, parseInt(env("FOUNDATIONS_REMOTE_TICK_LIMIT", "128"), 128)));
     private static final long GROWTH_CONTROL_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(8);
     private static final TicketType<ChunkPos> REMOTE_GROWTH_TICKET = TicketType.create("foundations_remote_growth", Comparator.comparingLong(ChunkPos::toLong));
+    private static final TicketType<String> HANDOFF_PRELOAD_TICKET = TicketType.create("foundations_handoff_preload", Comparator.naturalOrder());
+    private final HandoffChunkPreloader handoffPreloads = new HandoffChunkPreloader(new HandoffChunkPreloader.Completion() {
+        @Override public void ready(String id,int chunks,long elapsedNanos) {
+            post("/api/agent/handoff/ready","{\"handoffId\":\""+esc(id)+"\",\"workerId\":\""+esc(workerId)+"\"}");
+            LOG.info("Destination handoff {} preload READY chunks={} elapsedMs={}",id,chunks,TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
+        }
+        @Override public void abort(String id,String reason) {
+            post("/api/agent/handoff/abort","{\"handoffId\":\""+esc(id)+"\",\"workerId\":\""+esc(workerId)+"\",\"error\":\""+esc(reason)+"\"}");
+            LOG.warn("Destination handoff {} preload aborted: {}",id,reason);
+        }
+    });
     private final RemoteTickLeases remoteTickLeases = new RemoteTickLeases(remoteTickLimit, TimeUnit.MILLISECONDS.toNanos(remoteTickTtlMillis));
     private final Map<String,Long> naturalChunkTicks = new HashMap<>(), capturedChunkMutations = new HashMap<>();
     private long lastGrowthControlNanos, allowedGrowthTicks, suppressedGrowthTicks, lastGrowthCapacityLog;
@@ -227,6 +238,7 @@ public final class FoundationsClusterNode {
     private void serverStopping(ServerStoppingEvent e) {
         snapshotServerMetrics();
         releaseAllRemoteGrowthTickets();
+        handoffPreloads.close();
         if (persistenceEnabled) {
             flushCapturedBlocks();
             if (blockEntityPersistenceEnabled) {
@@ -320,6 +332,7 @@ public final class FoundationsClusterNode {
         }
         tickCounter++;
         worldEnvironment.tick(e.getServer());
+        handoffPreloads.tick(System.nanoTime());
         flushCapturedBlocks();
         sealedRegions.entrySet().removeIf(x->x.getValue()<System.currentTimeMillis());
         if (!hydration.pending().isEmpty() && System.currentTimeMillis()-lastPersistenceReplayRequestMillis>=5000L) requestPersistenceReplay();
@@ -443,19 +456,36 @@ public final class FoundationsClusterNode {
     }
 
     private void preloadHandoffDestination(String id,String playerName,String snapshot){
-        try{
-            String dimension=jsonString(snapshot,"dimensionId");double x=jsonDouble(snapshot,"x",0),z=jsonDouble(snapshot,"z",0);
+        try {
+            if(server==null)return;
+            String dimension=jsonString(snapshot,"dimensionId");
+            double x=jsonDouble(snapshot,"x",Double.NaN),z=jsonDouble(snapshot,"z",Double.NaN);
+            if(!Double.isFinite(x)||!Double.isFinite(z)||Math.abs(x)>29_999_984||Math.abs(z)>29_999_984)
+                throw new IllegalArgumentException("Invalid destination coordinates");
             ResourceLocation location=ResourceLocation.tryParse(dimension);
             ServerLevel level=location==null?null:server.getLevel(ResourceKey.create(Registries.DIMENSION,location));
-            if(level==null)level=server.overworld();
+            if(level==null)throw new IllegalArgumentException("Unknown destination dimension");
             int chunkX=Math.floorDiv((int)Math.floor(x),16),chunkZ=Math.floorDiv((int)Math.floor(z),16);
-            int radius=Math.max(0,parseInt(env("FOUNDATIONS_HANDOFF_PRELOAD_RADIUS","2"),2));
-            for(int dx=-radius;dx<=radius;dx++)for(int dz=-radius;dz<=radius;dz++)level.getChunk(chunkX+dx,chunkZ+dz);
-            post("/api/agent/handoff/ready","{\"handoffId\":\""+esc(id)+"\",\"workerId\":\""+esc(workerId)+"\"}");
-            LOG.info("Prepared handoff destination {} for {} around chunk {},{} radius={}",id,playerName,chunkX,chunkZ,radius);
+            int radius=Math.max(0,Math.min(HandoffChunkPreloader.MAX_RADIUS,parseInt(env("FOUNDATIONS_HANDOFF_PRELOAD_RADIUS","2"),2)));
+            var adapter=new HandoffChunkPreloader.Chunks() {
+                @Override public void request(HandoffChunkPreloader.Chunk c){
+                    ChunkPos p=new ChunkPos(c.x(),c.z());
+                    level.getChunkSource().addRegionTicket(HANDOFF_PRELOAD_TICKET,p,2,id,true);
+                }
+                @Override public boolean loaded(HandoffChunkPreloader.Chunk c){
+                    return level.getChunkSource().getChunkNow(c.x(),c.z())!=null;
+                }
+                @Override public void release(HandoffChunkPreloader.Chunk c){
+                    ChunkPos p=new ChunkPos(c.x(),c.z());
+                    level.getChunkSource().removeRegionTicket(HANDOFF_PRELOAD_TICKET,p,2,id,true);
+                }
+            };
+            if(handoffPreloads.start(id,dimension,chunkX,chunkZ,radius,adapter,System.nanoTime()))
+                LOG.info("Destination handoff {} async ticket preload queued player={} chunks={} radius={}",
+                    id,playerName,(2*radius+1)*(2*radius+1),radius);
         }catch(Exception ex){
-            post("/api/agent/handoff/abort","{\"handoffId\":\""+esc(id)+"\",\"workerId\":\""+esc(workerId)+"\",\"error\":\""+esc(ex.getMessage())+"\"}");
-            LOG.warn("Could not preload handoff destination {}: {}",id,ex.getMessage());
+            post("/api/agent/handoff/abort","{\"handoffId\":\""+esc(id)+"\",\"workerId\":\""+esc(workerId)+"\",\"error\":\"Invalid destination preload request\"}");
+            LOG.warn("Could not queue handoff destination {}: {}",id,ex.getMessage());
         }
     }
 

@@ -61,6 +61,12 @@ for name in ['transfer.RegionTransferCoordinatorSelfTest', 'persistence.Persiste
 node = compile_to('minecraft-agent/build/persistence-test-classes', [ROOT / f'minecraft-agent/src/main/java/com/foundations/cluster/node/{n}.java' for n in ['AuthorityHydration', 'RemoteTickLeases']] + [ROOT / f'tests/{n}SelfTest.java' for n in ['AuthorityHydration', 'RemoteTickLeases']])
 for name in ['AuthorityHydration', 'RemoteTickLeases']:
     run(a.java, '-cp', node, 'com.foundations.cluster.node.' + name + 'SelfTest')
+# Pure Java scheduler regression exercises the exact handoff preload coordinator
+# without loading any game world or requiring NeoForge dependencies.
+preload = compile_to('minecraft-agent/build/handoff-test-classes', [
+    ROOT / 'minecraft-agent/src/main/java/com/foundations/cluster/node/HandoffChunkPreloader.java',
+    ROOT / 'tests/HandoffChunkPreloaderSelfTest.java'])
+run(a.java, '-cp', preload, 'HandoffChunkPreloaderSelfTest')
 simulator = compile_to('node-simulator/build/classes', ROOT.glob('node-simulator/src/main/java/**/*.java'))
 jar(simulator, 'node-simulator/build/FoundationsClusterNodeSimulator.jar', 'com.foundations.cluster.simulator.Main')
 for test in sorted((ROOT / 'tests').glob('testlab_*_test.cjs')):
