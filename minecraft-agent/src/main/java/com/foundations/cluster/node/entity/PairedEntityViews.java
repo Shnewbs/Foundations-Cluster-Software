@@ -42,9 +42,10 @@ public final class PairedEntityViews implements AutoCloseable {
     private final Map<UUID,Ticket> tickets=new HashMap<>();
     private final Set<UUID> disabledHere=new HashSet<>();
     private List<Pair> owned=List.of();
-    // Experimental switch enables recurring discovery without a per-entity pair.
-    // Remains OFF on restart until an operator enables it in this development build.
-    private boolean automatic;
+    // Discover already-loaded entities near consenting remote players by default.
+    // Operator can suspend discovery with /foundations_entities auto off.
+    // Display-only: no gameplay replicas, ownership changes, or chunk loads.
+    private boolean automatic=true;
     private List<Player> remoteInterests=List.of();
     private int autoDiscovered,autoSkipped;
     private UUID managerBoot;
