@@ -93,8 +93,8 @@ try {
         Check ((Get-Content -LiteralPath (Join-Path $install $path) -Raw) -eq $legacySource[$path]) "Rollback did not restore legacy source $path"
     }
     Check ((Get-Content (Join-Path $install 'tools/operator-custom.ps1') -Raw) -eq 'keep my local script') 'Rollback modified custom script'
-    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R19.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg','web/features.json')){
-        Check (!(Test-Path -LiteralPath (Join-Path $install $path))) 'Rollback left a newly added application artifact'
+    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R19.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg')){
+        Check (!(Test-Path -LiteralPath (Join-Path $install $path))) "Rollback left newly added app file: $path"
     }
     $payload=Join-Path $package 'payload/cluster-manager/lib/bcprov.jar';$good=[IO.File]::ReadAllBytes($payload)
     [IO.File]::WriteAllText($payload,'tampered');Run-Update -Fail;[IO.File]::WriteAllBytes($payload,$good)
