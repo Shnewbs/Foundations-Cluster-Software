@@ -1,29 +1,32 @@
-# Foundations Cluster — 0.0.7a-dev.2 / Node R15
+# Foundations Cluster — 0.0.7a-dev.2.R2 / Node R16
 
-Installable development update after HF16: opt-in connected-player observations,
-read-only player .dat inventory comparisons, local report summaries and real
-scheduled-tick codec/time-skew tests. Manager API and gateway stay at R19.
+Installable development revision for Minecraft 1.21.1 / NeoForge 21.1.250.
 
-**Remote Survival breaking/placement remain disabled. This is not completed 7a.**
-The dev.1 inventory journals/adapters remain groundwork; this release does not
-install them as the live inventory authority or restore player saves.
+**Opt-in paired entity views:** explicitly pair a vanilla cow or dropped item on
+its source worker, then view its UUID, source coordinates, facing, movement and
+synchronized presentation data from another compatible worker. Remote copies are
+packets only: no destination AI, world entity, loot or pickup is created.
 
-Download the versioned UPDATER asset, stop the entire cluster, extract separately
-and run APPLY_UPDATE.bat. Test on a stopped backup/copy. Confirm Node R15 on every
-worker. Existing HF16 shutdown/restart controls, row navigation and Stop/Kill remain.
+**Not completed 7a.** Remote Survival breaking/placement, entity ownership transfer,
+remote pickups, generic modded entity support and crash-safe entity promotion are
+still gated. Keep the real source worker online and the region owned by it.
+The existing transition pause has not been eliminated by this revision.
 
-[Install and live test guide](docs/PLAYTEST_DEV2_GUIDE.md)
-[Changes, evidence scope and remaining gates](docs/status/0_0_7A_DEVELOPMENT_2.md)
+Download the versioned UPDATER release, stop every cluster process and run
+`APPLY_UPDATE.bat` against a backup/test copy. Confirm package **dev.2.R2** and
+**Node R16 on every worker**. Existing HF16 shutdown/restart/worker-row controls
+remain included. No extra mod ID or new client mod is added.
 
-Start with `/foundations_playtest start control first_test` as a connected operator.
-Recording is off otherwise. `mark`, `status`, `check-save`, and `stop` are read-only
-with respect to game/player state. Reports remain under the active world's
-`foundations-playtest` directory and are never uploaded automatically.
+[Entity test and rollback guide](docs/ENTITY_VIEWS_REV2_GUIDE.md)
+contains exact commands and restrictions. Read it before testing.
+[Change scope and validation gates](docs/status/0_0_7A_DEV2_REV2.md)
+separates portable/HTTP/NeoForge tests from joined-client acceptance.
 
-Build with Java 21, Python 3.12 and Node 22: `python tools/validate.py`, then
-`python tools/validate_survival_spike.py`. Windows CI also validates gateway builds
-and updater apply/rollback. Source and evidence are included in TEST-TOOLS assets.
-Development publication is gated on both platforms; existing releases are not replaced.
+The TEST-TOOLS release includes exact tracked source, checksums and executed test
+logs. Ordinary builds use `minecraft-agent/build_mod.bat` or Gradle. Run
+`python tools/validate.py` with Java 21, Python and Node, then
+`python tools/validate_survival_spike.py` for the disposable NeoForge GameTests.
 
-Frozen World Replication v2.2 design: `docs/frozen_design/` (unchanged).
-Previous HF16 instructions: [historical README](docs/history/README_HF16.md).
+The legacy offline mapped-build helper is not the normal supported build path.
+Frozen architecture files are unchanged. Source on main remains HF16 while this
+work stays in draft PR3; older releases are never silently replaced.

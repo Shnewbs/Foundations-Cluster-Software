@@ -16,6 +16,8 @@ function Run-Update([string]$backup='',[switch]$Fail) {
 try {
     New-Item -ItemType Directory -Path $root | Out-Null
     Expand-Archive -LiteralPath $Archive -DestinationPath $package
+    $protected=@(@('runtime/paired-entity-views.bin','fixture pair metadata'),@('workers/worker-001/world/playerdata/player.dat','fixture player save'),@('runtime/operations.journal','fixture journal'))
+    foreach($item in $protected){Put $item[0] $item[1]}
     Put 'config/cluster.properties' 'operator config'
     Put 'runtime/security/keep.key' 'fixture secret'
     Put 'workers/worker-001/world/level.dat' 'fixture world'
@@ -33,12 +35,13 @@ try {
     $original=(Get-FileHash $jar).Hash
     Run-Update
     $manifest=Get-Content (Join-Path $package 'UPDATE_MANIFEST.json') -Raw | ConvertFrom-Json
-    Check ($manifest.version -eq '0.0.7a-dev.2') 'Wrong release package'
+    Check ($manifest.version -eq '0.0.7a-dev.2.R2') 'Wrong release package'
     foreach($item in $manifest.files){Check ((Get-FileHash (Join-Path $install $item.path)).Hash -eq $item.sha256) 'Installed hash mismatch'}
     foreach($path in @('web/operations.js','web/operations.css','web/worker-controls.js','web/worker-controls.css')){
         Check ($path -cin @($manifest.files.path)) 'Missing worker-controls payload'
     }
     foreach($pair in @(@('config/cluster.properties','operator config'),@('runtime/security/keep.key','fixture secret'),@('workers/worker-001/world/level.dat','fixture world'))){Check ((Get-Content (Join-Path $install $pair[0]) -Raw) -eq $pair[1]) 'Operator data changed'}
+    foreach($item in $protected){Check ((Get-Content (Join-Path $install $item[0]) -Raw) -eq $item[1]) 'Update changed protected entity/player/journal data'}
     $backup=(Get-ChildItem (Join-Path $install 'update-backups') -Directory | Select-Object -First 1).FullName
     Run-Update # Reapplying the same development version is explicitly supported.
     Check (!(Test-Path (Join-Path $install 'runtime/update-in-progress.json'))) 'Reinstall left an update marker'
@@ -51,7 +54,7 @@ try {
     Check ((Get-Content (Join-Path $install 'web/index.html') -Raw) -eq 'previous page') 'Rollback did not restore page'
     Check ((Get-Content (Join-Path $install 'web/operations.js') -Raw) -eq 'previous workspace') 'Rollback did not restore workspace'
     Check ((Get-Content (Join-Path $install 'web/operations.css') -Raw) -eq 'previous workspace styles') 'Rollback did not restore workspace styles'
-    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R15.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg','web/features.json')){
+    foreach($path in @('velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/build_gateway.ps1','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R16.jar','web/worker-controls.js','web/worker-controls.css','web/styles.css','web/icons.svg','web/features.json')){
         Check (!(Test-Path -LiteralPath (Join-Path $install $path))) 'Rollback left a newly added application artifact'
     }
     $payload=Join-Path $package 'payload/cluster-manager/lib/bcprov.jar';$good=[IO.File]::ReadAllBytes($payload)
@@ -72,5 +75,16 @@ try {
     $pending=Get-Content (Join-Path $install 'runtime/update-in-progress.json') -Raw|ConvertFrom-Json
     Run-Update -backup $pending.backup
     Check ((Get-FileHash $jar).Hash -eq $original) 'Recovery did not restore Manager'
+    foreach($item in $protected){Check ((Get-Content (Join-Path $install $item[0]) -Raw) -eq $item[1]) 'Rollback changed protected entity/player/journal data'}
+    # Validate the original dev.2 upgrade boundary, not only HF11 and reinstall.
+    $savedManager=[IO.File]::ReadAllBytes($jar)
+    foreach($label in @('0.0.7a-dev.2.R20','0.0.7a-dev.20','0.0.7a-dev.2')) {
+        Remove-Item -LiteralPath $jar
+        $testJar=[IO.Compression.ZipFile]::Open($jar,[IO.Compression.ZipArchiveMode]::Create)
+        try {$entry=$testJar.CreateEntry('com/foundations/cluster/manager/ClusterVersion.class');$writer=[IO.StreamWriter]::new($entry.Open());try{$writer.Write('metadata fixture '+$label)}finally{$writer.Dispose()}}finally{$testJar.Dispose()}
+        if($label -eq '0.0.7a-dev.2'){Run-Update;Check ((Get-FileHash $jar).Hash -eq ($manifest.files|Where-Object path -eq 'cluster-manager/build/FoundationsClusterManager.jar').sha256) 'Original dev.2 did not upgrade'}
+        else {Run-Update -Fail}
+    }
+    [IO.File]::WriteAllBytes($jar,$savedManager)
     Write-Host "Updater transactions: PASS ($checks checks; metadata fixtures, no live installation)"
 } finally {if(Test-Path -LiteralPath $root){Remove-Item -LiteralPath $root -Recurse -Force}}

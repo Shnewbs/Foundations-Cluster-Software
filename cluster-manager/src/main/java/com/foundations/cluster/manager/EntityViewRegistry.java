@@ -88,8 +88,10 @@ final class EntityViewRegistry implements AutoCloseable {
         }
         var observations=request.players().stream().filter(p->validAnchoredPlayers.contains(p.name().toLowerCase(Locale.ROOT)))
             .map(p->new Seen(peer,p,now)).toList();
-        long viewers=observations.stream().filter(s->allowed(peer,s.player.uuid(),now)).count();
-        if(viewers>EntityViewsWire.MAX_VIEWERS)throw new IllegalStateException("At most four paired-view viewers per worker");
+        // A full viewer list must not prevent this worker publishing its own entities.
+        // Deterministic selection bounds output; excess opted-in viewers receive no view.
+        var viewers=observations.stream().filter(s->allowed(peer,s.player.uuid(),now))
+            .sorted(Comparator.comparing(s->s.player.uuid().toString())).limit(EntityViewsWire.MAX_VIEWERS).toList();
         live.values().removeIf(l->l.source.worker.equals(peer.worker));
         for(State s:request.states()){
             Pair p=pairs.get(s.binding());if(p!=null)live.put(p.binding(),new Live(p,s,peer,request.sequence(),now));
@@ -97,7 +99,7 @@ final class EntityViewRegistry implements AutoCloseable {
         counters.put(peer.worker,new Counter(peer.instance,request.sequence()));positions.put(peer.worker,observations);
         var owned=pairs.values().stream().filter(p->p.worker().equals(peer.worker)&&peer.sameWorld(p)).map(p->p.interest(interested(p,now))).toList();
         var output=new ArrayList<Viewer>();
-        for(Seen seen:observations) {
+        for(Seen seen:viewers) {
             Player viewer=seen.player;if(!allowed(peer,viewer.uuid(),now))continue;
             var samples=new ArrayList<Sample>();
             for(Pair p:pairs.values()) {

@@ -64,7 +64,7 @@ jar(simulator, 'node-simulator/build/FoundationsClusterNodeSimulator.jar', 'com.
 for test in sorted((ROOT / 'tests').glob('testlab_*_test.cjs')):
     run('node', test)
 if not a.skip_http:
-    for name in ['hydration_api_test.py', 'support_api_test.py', 'restart_api_test.py', 'security_api_test.py']:
+    for name in ['hydration_api_test.py', 'support_api_test.py', 'restart_api_test.py', 'security_api_test.py', 'entity_views_api_test.py']:
         run(sys.executable, ROOT / 'tests' / name, '--java', a.java)
 playtest = compile_to('playtest/build/test-classes', [ROOT / 'minecraft-agent/src/main/java/com/foundations/cluster/playtest/PlaytestTrace.java', ROOT / 'tests/PlaytestTraceSelfTest.java'])
 run(a.java, '-cp', playtest, 'com.foundations.cluster.playtest.PlaytestTraceSelfTest')

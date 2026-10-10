@@ -74,6 +74,17 @@ public final class EntityViewRegistrySelfTest {
                 rejects(()->registry.pair(b,initial(UUID.randomUUID())));
                 check(registry.pairs().size()==EntityViewsWire.MAX_SOURCE_PAIRS,"source limit enforced without altering existing pairs");
             }
+            try(var registry=new EntityViewRegistry(root.resolve("viewer-cap"),clock::get)) {
+                var pair=registry.pair(a,initial(UUID.randomUUID()));
+                var viewers=new ArrayList<Player>();var names=new HashSet<String>();
+                for(int i=0;i<5;i++){var v=new Player(new UUID(0,i+1),"Viewer"+i,"minecraft:overworld",1,65,0);viewers.add(v);names.add(v.name().toLowerCase(Locale.ROOT));registry.view(a,v.uuid(),true);}
+                var capped=registry.exchange(a,new Request(1,List.of(state(pair,9)),viewers),names);
+                check(capped.viewers().size()==4,"viewer cap bounds output rather than rejecting the whole worker");
+                check(registry.freshCount()==1,"excess viewer does not interrupt source publication");
+                Collections.reverse(viewers);
+                var repeated=registry.exchange(a,new Request(2,List.of(state(pair,10)),viewers),names);
+                check(repeated.viewers().stream().map(Viewer::uuid).toList().equals(capped.viewers().stream().map(Viewer::uuid).toList()),"bounded viewer selection independent of iteration order");
+            }
             System.out.println("Paired entity registry: PASS ("+checks+" checks; metadata only, no entity ownership or world writes)");
         }finally{try(var paths=Files.walk(root)){for(Path p:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(p);}}
     }
