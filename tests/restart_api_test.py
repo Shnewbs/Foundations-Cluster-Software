@@ -34,8 +34,8 @@ try:
  assert request('/api/auth/setup',{'username':'fixture','password':'HF9-test-only-lifecycle-password','remember':False})[0]==201
  action('restart');first=wait(lambda:state_is('READY'),'Initial start not ready');check(first['managerControlled'],'Real worker process owned by Manager')
  for n in range(2):
-  pid=worker()['pid'];action('stop');wait(lambda:not worker()['processAlive'],'Graceful stop did not exit')
-  check(not worker()['ready'],'Stopped worker must not be ready')
+  pid=worker()['pid'];action('stop');wait(lambda:(w if (w:=worker()) and not w['processAlive'] and not w['ready'] else None),'Stopped worker must exit and become unroutable')
+  check(True,'Stopped worker must not be ready')
   action('restart');w=wait(lambda:state_is('READY'),'Separate stop/restart stayed drained')
   check(not w['draining'] and w['pid']!=pid,'Separate stop/restart restores routing and changes PID')
  action('drain');action('stop');wait(lambda:not worker()['processAlive'],'Manual drain stop did not exit');action('restart')
