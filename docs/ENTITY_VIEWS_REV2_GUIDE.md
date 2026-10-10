@@ -1,11 +1,11 @@
-# Rev2 — paired cow/item views
+# Rev2 — automatic cow/item views (development)
 
 Package **0.0.7a-dev.2.R2**, Node **0.0.6a.R16**, Manager API/gateway R19.
 Minecraft **1.21.1 / NeoForge 21.1.250** only.
 
 ## What this build does
 
-An explicitly paired vanilla cow or dropped item remains a real entity on its
+Supported loaded vanilla cows or dropped items are automatically discovered near opted-in viewers on compatible workers, without per-entity pairing. The real cow or item remains on its
 source worker. Opted-in players on another compatible worker receive a packet-only
 view using that entity's UUID, authoritative coordinates, facing, velocity and
 synchronized presentation data. Movement and data updates reuse the local view ID.
@@ -38,25 +38,21 @@ Worlds, player saves, inventories, profiles, configuration, security, journals a
 pair selections are excluded from the updater payload. Later Node synchronization
 and gateway runtime patching have separate backups.
 
-## First test: observe the same entity from worker B
+## First test: automatically observe the same entity from worker B
 
 Use two READY/ACTIVE workers with matching world identity/seed and the same modpack.
 Pin the source worker online. Keep it running and keep the entity's region owned by
 it throughout this first test. This is not a source-stop/failover acceptance test.
 
-As a connected operator on **worker A**, stand within 16 blocks of a vanilla cow
-in an ACTIVE region owned by A. A named cow is easy to distinguish. Run:
+As a connected operator on **worker A**, stand near a vanilla cow
+in an ACTIVE region owned by A. A named cow is easy to distinguish. Automatic discovery runs on the source by default. Run:
 
 ```text
-/foundations_entities pair @e[type=minecraft:cow,sort=nearest,limit=1,distance=..16]
-/foundations_entities list
 /foundations_entities status
 /foundations_entities view on
 ```
 
-Wait for the Manager confirmation, not merely the "request queued" message.
-`pair` records the real UUID and source worker. Repeating it on that source reuses
-the pairing; attempting to pair the same UUID to another source is refused.
+Wait for the Manager to confirm viewer consent. No entity pairing command is required in automatic mode. Manual `pair` remains a diagnostic override, not part of the normal discovery workflow.
 
 On **worker B**, use another connected operator at the same world coordinates and
 dimension, or change your own backend while leaving source A online and its region
@@ -79,11 +75,7 @@ stable client integer IDs across gateways are not implemented here.
 
 ## Dropped item
 
-On A, drop an ordinary item, stand near it, and pair the exact item entity:
-
-```text
-/foundations_entities pair @e[type=minecraft:item,sort=nearest,limit=1,distance=..16]
-```
+On A, drop an ordinary item and keep its authoritative region loaded. It should be discovered automatically while an opted-in viewer on B is nearby.
 
 Watch it on B. The preview shows the real item type/count and supported component
 presentation. Pick up the **real** item on A; B's view should disappear after a fresh
@@ -131,7 +123,7 @@ No entire-world duplicate entity simulation is introduced.
 
 ## What to send back
 
-Record A/B worker IDs, the pairing UUID from `list`, status output on both workers,
+Record A/B worker IDs, the entity UUID if available, status output on both workers,
 world coordinates, and whether A still owns the region. Report whether position,
 facing and item disappearance agree, and how long the transition hiccup feels.
 A short video is useful for visual continuity; server test counts do not prove it.
@@ -151,3 +143,16 @@ That restores the program files covered by this updater. It does not roll back
 world changes or later Node/template synchronization; preserve their separate
 backups too. Verify the old Manager's required Node version on every worker before
 rejoining. Never delete a world or pair metadata to solve a version mismatch.
+
+## Automatic discovery boundaries
+
+Discovery defaults **ON** in this development branch, but viewing continues to
+require each real connected operator's explicit `/foundations_entities view on`
+consent, limited to 15 minutes. Operators can halt automatic discovery using
+`/foundations_entities auto off` on a source; `auto on` resumes it. The setting
+resets to ON after a fresh restart, and is **not** a persistent server policy.
+Only already-loaded entities with the exact supported vanilla cow or item type,
+current ACTIVE authoritative source region, matching dimension/world and a fresh
+nearby consenting viewer are eligible. Entities are bounded by per-exchange caps.
+This does not automatically support every modded entity. No remote gameplay,
+entity ownership migration, or entity persistence transfer is enabled.
