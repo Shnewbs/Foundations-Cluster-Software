@@ -48,10 +48,11 @@ manager_jar = jar(manager, 'cluster-manager/build/FoundationsClusterManager.jar'
 cp = os.pathsep.join(map(str, [manager_jar, bc]))
 tests = compile_to('cluster-manager/build/test-classes', ROOT.glob('cluster-manager/src/test/java/**/*.java'), cp)
 cp = os.pathsep.join([str(tests), cp])
-for name in ['R16SelfTest', 'R17SelfTest', 'R18SelfTest', 'R19SelfTest', 'NodeUpgradeSelfTest', 'NodeStartupSelfTest', 'R19HydrationSelfTest', 'SupportArchivesSelfTest', 'RestartAvailabilitySelfTest', 'HardeningSelfTest']:
+for name in ['R16SelfTest', 'R17SelfTest', 'R18SelfTest', 'R19SelfTest', 'NodeUpgradeSelfTest', 'NodeStartupSelfTest', 'R19HydrationSelfTest', 'SupportArchivesSelfTest', 'RestartAvailabilitySelfTest', 'HardeningSelfTest', 'EntityViewRegistrySelfTest']:
     run(a.java, '-cp', cp, 'com.foundations.cluster.manager.' + name, ROOT, *(['--fixture'] if name == 'NodeUpgradeSelfTest' else []))
 protocol = compile_to('protocol/build/test-classes', ROOT.glob('protocol/src/**/*.java'))
 run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.PlayerInventoryJournalSelfTest')
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.EntityViewsWireSelfTest')
 reference = compile_to('reference/build/classes', ROOT.glob('reference/src/**/*.java'))
 for name in ['transfer.RegionTransferCoordinatorSelfTest', 'persistence.PersistentRegionTransferSelfTest', 'replication.ReplicationProtocolSelfTest', 'replication.AuthorityResultJournalSelfTest']:
     run(a.java, '-cp', reference, 'com.foundations.cluster.' + name)

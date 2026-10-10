@@ -57,6 +57,19 @@ public final class FoundationsClusterNode {
     public static final String MOD_ID = "foundations_cluster_node";
     public static final String VERSION = "0.0.6a.R14";
     public static final int WORLD_IDENTITY_SCHEMA = 2;
+    /** Current process identity shared with the authenticated presentation service. */
+    public static String entityViewProcessInstance() {
+        FoundationsClusterNode n=activeNode;
+        return n==null || n.token.isBlank() || n.server==null ? "" : n.persistenceInstance;
+    }
+    /** Pair-view tickets and samples never bypass the existing region/control fence. */
+    public static boolean entityViewSourceReady(ServerLevel level,BlockPos pos) {
+        FoundationsClusterNode n=activeNode;
+        if(n==null || n.token.isBlank() || n.server!=level.getServer())return false;
+        String region=n.regionIdForBlock("foundations",level.dimension().location().toString(),pos);
+        OwnedAuthority own=n.ownedAuthorities.get(region);
+        return own!=null && n.growthAuthorityReady(region,own.epoch());
+    }
     private static volatile FoundationsClusterNode activeNode;
     private static final Logger LOG = LoggerFactory.getLogger("Foundations Cluster Node");
 
