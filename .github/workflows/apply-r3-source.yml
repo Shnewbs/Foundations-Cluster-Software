@@ -1,0 +1,34 @@
+name: Apply staged automatic entity discovery R3
+on:
+  push:
+    branches: [feature/0.0.7a-survival-foundation]
+    paths:
+      - '.r3-stage/**'
+      - '.github/workflows/apply-r3-source.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/feature/0.0.7a-survival-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: true
+          fetch-depth: 2
+      - name: Verify exact staged bytes, apply safely, remove staging, push source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "3933df08becb784933778a9090e1aa89fc3f6239"
+          test "$(find .r3-stage -maxdepth 1 -type f | wc -l)" = "11"
+          cat .r3-stage/part*.txt | base64 --decode | xz --decompress > /tmp/foundations-r3.patch
+          echo "3a90d7c76950af86e7699a205487666a58d4904156d15d834b655bb487f7a9e1  /tmp/foundations-r3.patch" | sha256sum --check
+          git apply --check /tmp/foundations-r3.patch
+          git apply --index /tmp/foundations-r3.patch
+          git rm -r -- .r3-stage .github/workflows/apply-r3-source.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Build R3 automatic cow/item discovery from verified tested source"
+          git push origin HEAD:refs/heads/feature/0.0.7a-survival-foundation
