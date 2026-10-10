@@ -80,18 +80,31 @@ public final class EntityOwnershipLedgerSelfTest {
         rejects(()->new EntityOwnershipLedger(temp));Files.write(snapshot,original);
         Path killStage=Files.createTempDirectory("foundations-stage-kill-");
         forceStopChild(killStage,false,"CHILD_STAGE_DURABLE");
-        try(var ledger=new EntityOwnershipLedger(killStage)){
+        try(var ledger=reopenAfterKilledChild(killStage)){
             check(ledger.view(KEY).orElseThrow().owner().worker().equals("worker-A"),"Killed JVM after stage retains A owner");
             check(ledger.view(KEY).get().staged()!=null,"Killed JVM leaves stage for retry/reconcile");
         }
         Path killCommit=Files.createTempDirectory("foundations-commit-kill-");
         forceStopChild(killCommit,true,"CHILD_COMMIT_DURABLE");
-        try(var ledger=new EntityOwnershipLedger(killCommit)){
+        try(var ledger=reopenAfterKilledChild(killCommit)){
             check(ledger.view(KEY).orElseThrow().owner().worker().equals("worker-B"),"Killed JVM after CAS retains B owner");
             check(ledger.view(KEY).get().owner().generation()==2,"Killed JVM cannot restore stale generation");
         }
         check(!EntityOwnershipLedger.hash(STATE).isBlank(),"Digest is stable");
         System.out.println("Entity ownership CAS recovery prototype PASS ("+checks+" checks; 2 forcibly killed child JVMs; not live entity transfer)");
+    }
+    private static EntityOwnershipLedger reopenAfterKilledChild(Path directory)throws Exception {
+        // Windows may release the killed JVM's kernel file lock slightly after
+        // Process.waitFor reports termination. Never bypass or steal the lock.
+        IOException busy=null;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        do {
+            try{return new EntityOwnershipLedger(directory);}
+            catch(IOException e){
+                if(!String.valueOf(e.getMessage()).contains("already open"))throw e;
+                busy=e;Thread.sleep(40);
+            }
+        }while(System.nanoTime()<deadline);
+        throw busy;
     }
     private static void forceStopChild(Path directory,boolean commit,String marker)throws Exception {
         String java=Path.of(System.getProperty("java.home"),"bin","java").toString();
