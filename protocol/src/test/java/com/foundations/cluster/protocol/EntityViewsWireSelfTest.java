@@ -24,6 +24,22 @@ public final class EntityViewsWireSelfTest {
         check(player.near(state),"within interest radius");check(!new Player(player.uuid(),"Fixture","minecraft:the_nether",0,65,10).near(state),"dimension isolated");
         check(!new Player(player.uuid(),"Fixture","minecraft:overworld",1000,65,10).near(state),"distance bounded");
         check(!EntityViewsWire.decodePairs(EntityViewsWire.encodePairs(List.of(pair))).getFirst().interested(),"transient interest is not persisted");
+        UUID auto=EntityViewsWire.autoBinding("worker-001",id);
+        check(auto.equals(EntityViewsWire.autoBinding("worker-001",id)),"Auto binding stays stable");
+        check(!auto.equals(EntityViewsWire.autoBinding("worker-002",id)),"Different worker source identity cannot impersonate previous binding");
+        var autoState=new State(auto,id,Kind.COW,"minecraft:overworld",state.x(),state.y(),state.z(),
+            state.yaw(),state.pitch(),state.headYaw(),state.vx(),state.vy(),state.vz(),state.onGround(),state.metadata());
+        var autoRequest=new Request(24,List.of(autoState),List.of(player),true);
+        var autoBack=EntityViewsWire.decodeRequest(EntityViewsWire.encodeRequest(autoRequest));
+        check(autoBack.automatic()&&autoBack.states().getFirst().binding().equals(auto),"Versioned automatic discovery request round trip");
+        var withInterest=new Response(24,UUID.randomUUID(),List.of(pair),List.of(),List.of(player));
+        check(EntityViewsWire.decodeResponse(EntityViewsWire.encodeResponse(withInterest)).interests().equals(List.of(player)),"Source viewer interest exact round trip");
+        rejects(()->new Request(1,List.of(autoState,autoState),List.of(),true));
+        var tooMany=new ArrayList<Player>();for(int i=0;i<EntityViewsWire.MAX_INTERESTS+1;i++)
+            tooMany.add(new Player(new UUID(0,i+1),"Viewer"+i,"minecraft:overworld",i,64,0));
+        rejects(()->new Response(1,UUID.randomUUID(),List.of(),List.of(),tooMany));
+        byte[] cutAuto=EntityViewsWire.encodeRequest(autoRequest);
+        rejects(()->EntityViewsWire.decodeRequest(Arrays.copyOf(cutAuto,cutAuto.length-1)));
         for(int i=0;i<encoded.length;i++){byte[] cut=Arrays.copyOf(encoded,i);rejects(()->EntityViewsWire.decodeRequest(cut));}
         for(int i=0;i<reply.length;i++){byte[] cut=Arrays.copyOf(reply,i);rejects(()->EntityViewsWire.decodeResponse(cut));}
         rejects(()->EntityViewsWire.decodeRequest(reply));rejects(()->EntityViewsWire.decodeResponse(encoded));

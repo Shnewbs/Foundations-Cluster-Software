@@ -42,6 +42,11 @@ public final class PairedEntityViews implements AutoCloseable {
     private final Map<UUID,Ticket> tickets=new HashMap<>();
     private final Set<UUID> disabledHere=new HashSet<>();
     private List<Pair> owned=List.of();
+    // Experimental switch enables recurring discovery without a per-entity pair.
+    // Remains OFF on restart until an operator enables it in this development build.
+    private boolean automatic;
+    private List<Player> remoteInterests=List.of();
+    private int autoDiscovered,autoSkipped;
     private UUID managerBoot;
     private long sequence,lastAttempt,lastValid;
     private boolean inFlight,closed;
@@ -58,6 +63,8 @@ public final class PairedEntityViews implements AutoCloseable {
             return get(c.getSource().getServer()).pair(c.getSource(),EntityArgument.getEntity(c,"entity"));})));
         root.then(Commands.literal("unpair").then(Commands.argument("uuid",StringArgumentType.word()).executes(c->
             get(c.getSource().getServer()).unpair(c.getSource(),StringArgumentType.getString(c,"uuid")))));
+        for(boolean value:new boolean[]{true,false})root.then(Commands.literal("auto").then(Commands.literal(value?"on":"off").executes(c->
+            get(c.getSource().getServer()).auto(c.getSource(),value))));
         for(boolean value:new boolean[]{true,false})root.then(Commands.literal("view").then(Commands.literal(value?"on":"off").executes(c->
             get(c.getSource().getServer()).view(c.getSource(),value))));
         root.then(Commands.literal("list").executes(c->get(c.getSource().getServer()).list(c.getSource())));
@@ -84,6 +91,17 @@ public final class PairedEntityViews implements AutoCloseable {
             });return 1;
         }catch(Exception e){return error(source,e);}
     }
+    private int auto(CommandSourceStack source,boolean enabled) {
+        try {
+            operator(source);
+            automatic=enabled;remoteInterests=List.of();lastAttempt=0;
+            if(!enabled) autoDiscovered=0;
+            source.sendSuccess(()->Component.literal(enabled?
+                "Automatic entity discovery ON (loaded, authoritative vanilla cows/items only; display-only, no remote gameplay). Nearby viewers must still opt in with /foundations_entities view on.":
+                "Automatic entity discovery OFF. Automatic remote previews will expire; no real mobs/items are modified."),false);
+            return 1;
+        }catch(Exception e){return error(source,e);}
+    }
     private int unpair(CommandSourceStack source,String id) {
         try{var p=operator(source);UUID uuid=UUID.fromString(id);command(source,p,"unpair",",\"entity\":"+q(uuid.toString()),r->message(p,"Unpaired view "+uuid+". The real entity was not changed."));return 1;}
         catch(Exception e){return error(source,e);}
@@ -107,7 +125,8 @@ public final class PairedEntityViews implements AutoCloseable {
     }
     private int status(CommandSourceStack source) {
         source.sendSuccess(()->Component.literal("ENTITY_VIEWS node="+FoundationsClusterNode.VERSION+" worker="+worker+
-            " mode=PAIRED_DISPLAY_ONLY sourcePairs="+owned.size()+" unavailableSources="+unavailable+" temporaryTickets="+tickets.size()+
+            " mode=SOURCE_BOUND_DISPLAY_ONLY auto="+automatic+" tracked="+autoDiscovered+" skipped="+autoSkipped+
+            " remoteInterestCenters="+remoteInterests.size()+" sourcePairs="+owned.size()+" unavailableSources="+unavailable+" temporaryTickets="+tickets.size()+
             " remoteViews="+clients.values().stream().mapToInt(v->v.renderer.size()).sum()+" identityCollisions="+clients.values().stream().mapToInt(v->v.renderer.collisions()).sum()+
             " remoteSurvival=false ownershipTransfer=false remotePickup=false status="+lastProblem),false);return 1;
     }
@@ -138,6 +157,16 @@ public final class PairedEntityViews implements AutoCloseable {
             if(e==null||!FoundationsClusterNode.entityViewSourceReady((ServerLevel)e.level(),e.blockPosition())){unavailable++;continue;}
             try{states.add(EntityViewPackets.capture(e,p.binding()));}catch(Exception ex){unavailable++;}
         }
+        if(automatic && now-lastValid<EntityViewsWire.FRESH_MILLIS) {
+            Set<UUID> excluded=new HashSet<>();for(State paired:states)excluded.add(paired.entity());
+            try {
+                var snapshot=AutomaticEntityDiscovery.collect(server,worker,remoteInterests,excluded,
+                    e->e.level() instanceof ServerLevel level &&
+                        FoundationsClusterNode.entityViewSourceReady(level,e.blockPosition()),
+                    Math.min(EntityViewsWire.MAX_AUTO_STATES,EntityViewsWire.MAX_SOURCE_STATES-states.size()));
+                states.addAll(snapshot.states());autoDiscovered=snapshot.states().size();autoSkipped=snapshot.skipped();
+            }catch(Exception ignored){autoDiscovered=0;autoSkipped=0;lastProblem="automatic source discovery unavailable";}
+        } else {autoDiscovered=0;autoSkipped=0;}
         var playerRefs=new LinkedHashMap<UUID,ServerPlayer>();var positions=new ArrayList<Player>();
         for(ServerPlayer p:server.getPlayerList().getPlayers()) {
             if(positions.size()>=EntityViewsWire.MAX_PLAYERS)break;
@@ -146,7 +175,7 @@ public final class PairedEntityViews implements AutoCloseable {
         }
         try {
             long seq=Math.incrementExact(sequence);sequence=seq;
-            String body=envelope("exchange")+",\"bundle\":"+q(base64(EntityViewsWire.encodeRequest(new Request(seq,states,positions))))+"}";
+            String body=envelope("exchange")+",\"bundle\":"+q(base64(EntityViewsWire.encodeRequest(new Request(seq,states,positions,automatic))))+"}";
             inFlight=true;
             io.execute(()->{
                 try {
@@ -164,7 +193,9 @@ public final class PairedEntityViews implements AutoCloseable {
     private void apply(Response response,Map<UUID,ServerPlayer> refs,long started)throws IOException {
         long now=now();
         if(managerBoot!=null&&!managerBoot.equals(response.boot()))clearClients();managerBoot=response.boot();
-        owned=response.owned();lastValid=now;lastProblem="connected; preview only";
+        owned=response.owned();lastValid=now;
+        remoteInterests=automatic?response.interests():List.of();
+        lastProblem="connected; preview only";
         Set<UUID> keep=new HashSet<>();
         for(Viewer v:response.viewers()) {
             ServerPlayer p=refs.get(v.uuid());if(p==null||!current(p)||disabledHere.contains(v.uuid()))continue;
@@ -181,6 +212,7 @@ public final class PairedEntityViews implements AutoCloseable {
     private void maintainTickets(long now) {
         Map<UUID,Ticket> keep=new HashMap<>();
         if(now-lastValid<EntityViewsWire.FRESH_MILLIS)for(Pair p:owned) {
+            if(keep.size()>=EntityViewsWire.MAX_SOURCE_PAIRS)break; // hard cap of nonpersistent source tickets
             if(!p.interested())continue;Entity entity=find(p);
             if(entity==null||entity.isRemoved()||!FoundationsClusterNode.entityViewSourceReady((ServerLevel)entity.level(),entity.blockPosition()))continue;
             try{EntityViewPackets.supported(entity);}catch(IllegalArgumentException ex){continue;}
@@ -216,7 +248,7 @@ public final class PairedEntityViews implements AutoCloseable {
     private static void message(ServerPlayer p,String text){p.sendSystemMessage(Component.literal(text));}
     private static int error(CommandSourceStack source,Exception e){source.sendFailure(Component.literal(e instanceof IllegalArgumentException||e instanceof IllegalStateException?Objects.toString(e.getMessage(),"Invalid request"):"Entity preview unavailable; check player/source readiness and supported entity type"));return 0;}
     private void clearClients(){for(ClientView c:clients.values())c.renderer.clear();clients.clear();}
-    @Override public void close(){closed=true;io.shutdownNow();clearClients();for(var e:tickets.entrySet()){
+    @Override public void close(){closed=true;automatic=false;remoteInterests=List.of();io.shutdownNow();clearClients();for(var e:tickets.entrySet()){
         Ticket t=e.getValue();t.level.getChunkSource().removeRegionTicket(TICKET,t.chunk,2,e.getKey(),true);
     }tickets.clear();owned=List.of();}
 }

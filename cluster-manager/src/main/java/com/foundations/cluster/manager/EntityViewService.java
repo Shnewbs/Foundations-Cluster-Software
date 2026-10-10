@@ -15,13 +15,21 @@ final class EntityViewService implements AutoCloseable {
     private final EntityViewRegistry registry;
     EntityViewService(ManagerConfig cfg,WorkerManager workers,SessionManager sessions,RegionAuthorityManager regions)throws IOException {
         this.cfg=cfg;this.workers=workers;this.sessions=sessions;this.regions=regions;
-        registry=new EntityViewRegistry(cfg.home().resolve("runtime"));
+        registry=new EntityViewRegistry(cfg.home().resolve("runtime"),
+            ()->System.nanoTime()/1000000L,this::activeSource);
     }
     private EntityViewRegistry.Peer peer(Map<String,String> m) {
         String id=m.getOrDefault("workerId","");WorkerRecord w=workers.get(id);
         if(w==null||!healthy(w)||!w.persistenceInstance.equals(m.getOrDefault("instance","")))
             throw new SecurityException("Worker telemetry/identity/version or process instance is not current");
         return new EntityViewRegistry.Peer(id,w.persistenceInstance,w.worldIdentity,w.worldSeed);
+    }
+    private boolean activeSource(EntityViewRegistry.Peer peer,State state) {
+        if(!healthy(peer))return false;
+        RegionRecord region=regions.get(regions.forBlock("foundations",state.dimension(),state.x(),state.z()).id());
+        return region!=null && region.state==RegionState.ACTIVE &&
+            peer.worker().equals(region.ownerWorkerId) &&
+            System.currentTimeMillis()<region.leaseExpiresAtMillis;
     }
     private boolean healthy(WorkerRecord w) {
         return w.usableForExistingSession() && w.heartbeatAgeSeconds()>=0 && w.heartbeatAgeSeconds()<8 &&
@@ -86,7 +94,7 @@ final class EntityViewService implements AutoCloseable {
     }
     String status()throws IOException {
         registry.invalidateUnavailable(this::healthy);
-        return "{\"scope\":\"paired-display-only\",\"entityOwnershipTransfer\":false,\"remotePickup\":false,\"paired\":"+registry.pairs().size()+",\"fresh\":"+registry.freshCount()+",\"optedInViewers\":"+registry.viewerCount()+"}";
+        return "{\"scope\":\"paired-display-only\",\"entityOwnershipTransfer\":false,\"remotePickup\":false,\"paired\":"+registry.pairs().size()+",\"automaticFresh\":"+registry.discoveredCount()+",\"fresh\":"+registry.freshCount()+",\"optedInViewers\":"+registry.viewerCount()+"}";
     }
     @Override public void close(){registry.close();}
 }

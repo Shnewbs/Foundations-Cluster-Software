@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 # Reviewed 7a-dev.2 control-plane, gateway, Node and complete dashboard payload; operator data is excluded.
-$allowed = @('tools/start_foundations.ps1','cluster-manager/lib/bcprov.jar','cluster-manager/build/FoundationsClusterManager.jar','tools/setup_velocity.ps1','tools/build_gateway.ps1','velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/conduit-r15-patch/SeamlessConfigSessionHandler.java','tools/conduit-r15-patch/FoundationsHandshakeCapture.java','tools/conduit-r15-patch/FoundationsTagConfiguration.java','tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java','tools/conduit-r15-patch/GPL-3.0.txt','tools/conduit-r15-patch/README.txt','velocity-gateway/source/FoundationsVelocityGateway.java','velocity-gateway/resources/velocity-plugin.json','web/app.js','web/index.html','web/operations.js','web/operations.css','web/styles.css','web/icons.svg','web/features.json','web/worker-controls.js','web/worker-controls.css','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R16.jar')
+$allowed = @('tools/start_foundations.ps1','cluster-manager/lib/bcprov.jar','cluster-manager/build/FoundationsClusterManager.jar','tools/setup_velocity.ps1','tools/build_gateway.ps1','velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar','velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar','tools/conduit-r15-patch/SeamlessConfigSessionHandler.java','tools/conduit-r15-patch/FoundationsHandshakeCapture.java','tools/conduit-r15-patch/FoundationsTagConfiguration.java','tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java','tools/conduit-r15-patch/GPL-3.0.txt','tools/conduit-r15-patch/README.txt','velocity-gateway/source/FoundationsVelocityGateway.java','velocity-gateway/resources/velocity-plugin.json','web/app.js','web/index.html','web/operations.js','web/operations.css','web/styles.css','web/icons.svg','web/features.json','web/worker-controls.js','web/worker-controls.css','minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R17.jar')
 $ClusterRoot = [IO.Path]::GetFullPath($ClusterRoot).TrimEnd('\','/')
 function Safe-Path([string]$base, [string]$relative) {
     if (!$relative -or $relative -notmatch '^[A-Za-z0-9_./-]+$' -or $relative.StartsWith('/') -or $relative -match '(^|/)(\.|\.\.)(/|$)' -or $relative.Contains('//')) { throw "Unsafe path: $relative" }
@@ -80,7 +80,7 @@ try {
     if (Test-Path -LiteralPath $marker) { throw 'Previous update interrupted. Use -Rollback with the backup named in runtime/update-in-progress.json.' }
     $package=Split-Path -Parent $PSScriptRoot
     $manifest=Get-Content -LiteralPath (Safe-Path $package 'UPDATE_MANIFEST.json') -Raw | ConvertFrom-Json
-    if ($manifest.schema -ne 1 -or $manifest.component -ne 'manager-gateway-node' -or $manifest.version -ne '0.0.7a-dev.2.R2') { throw 'Unsupported updater manifest' }
+    if ($manifest.schema -ne 1 -or $manifest.component -ne 'manager-gateway-node' -or $manifest.version -ne '0.0.7a-dev.2.R3') { throw 'Unsupported updater manifest' }
     $jar=Destination 'cluster-manager/build/FoundationsClusterManager.jar'
     $zip=[IO.Compression.ZipFile]::OpenRead($jar)
     try {
@@ -88,7 +88,7 @@ try {
         if (!$entry) { throw 'Manager version class missing' }
         $reader=[IO.StreamReader]::new($entry.Open(),[Text.Encoding]::ASCII)
         try { $versionBytes=$reader.ReadToEnd() } finally { $reader.Dispose() }
-        if ($versionBytes -notmatch '(?:0\.0\.6a\.R19-HF(?:11|12|13|14|15|16)(?![0-9])|0\.0\.7a-dev\.2(?:\.R2)?(?![A-Za-z0-9_.-]))') { throw 'This updater requires an HF11 through HF16, original dev.2, or matching dev.2.R2 installation. Install the matching baseline first.' }
+        if ($versionBytes -notmatch '(?:0\.0\.6a\.R19-HF(?:11|12|13|14|15|16)(?![0-9])|0\.0\.7a-dev\.2(?:\.R2|\.R3)?(?![A-Za-z0-9_.-]))') { throw 'This updater requires an HF11 through HF16, original dev.2, or matching dev.2.R2/R3 installation. Install the matching baseline first.' }
     } finally { $zip.Dispose() }
     $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     if (@($manifest.files).Count -ne $allowed.Count) { throw 'Incomplete updater manifest' }
@@ -99,7 +99,7 @@ try {
         $source=Safe-Path $package ('payload/'+$item.path)
         if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $item.sha256) { throw "Payload checksum failed: $($item.path)" }
     }
-    $relative='update-backups/7a-dev2-R2-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N')
+    $relative='update-backups/7a-dev2-R3-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N')
     $backup=Safe-Path $ClusterRoot $relative;New-Item -ItemType Directory -Path $backup | Out-Null
     $records=@()
     # Complete and flush the whole backup before modifying a single installed file.
@@ -120,7 +120,7 @@ try {
     }
     Remove-Item -LiteralPath $marker
     Write-Host "Installed $($manifest.version). Backup: $backup" -ForegroundColor Green
-    Write-Host '0.0.7a-dev.2.R2 installed; Node R16 is staged. Entity paired views and playtest recording require explicit opt-in. Entity views are display-only; ownership transfer and remote pickups remain disabled. Start the cluster and refresh the dashboard with Ctrl+F5. Worlds, credentials and configuration were preserved. Remote Survival editing remains disabled.'
+    Write-Host '0.0.7a-dev.2.R3 installed; Node R17 is staged. Automatic entity discovery is available with /foundations_entities auto on; remote viewing requires opt-in. Entity views are display-only; ownership transfer and remote pickups remain disabled. Start the cluster and refresh the dashboard with Ctrl+F5. Worlds, credentials and configuration were preserved. Remote Survival editing remains disabled.'
 } catch {
     $failure=$_
     if ($started) {

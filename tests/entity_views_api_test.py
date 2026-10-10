@@ -3,6 +3,7 @@ import argparse
 import base64
 import http.cookiejar
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -91,10 +92,11 @@ def encode_state(binding, entity, x=2):
     return (binding.bytes+entity.bytes+b'\0'+utf('minecraft:overworld')+
             struct.pack('>dddfffddd?I',x,65.,2.,45.,10.,60.,.1,0.,0.,True,2)+b'\0\xff')
 
-def bundle(sequence, states=(), players=()):
-    data = struct.pack('>IBBqI',0x46434556,1,1,sequence,len(states))+b''.join(states)+struct.pack('>I',len(players))
+def bundle(sequence, states=(), players=(), automatic=False):
+    data = struct.pack('>IBBqI',0x46434556,2,1,sequence,len(states))+b''.join(states)+struct.pack('>I',len(players))
     for ident,name,dim,x in players:
         data += ident.bytes+utf(name)+utf(dim)+struct.pack('>ddd',x,65.,2.)
+    data += struct.pack('>?',automatic)
     return b64(data)
 
 class Decoder:
@@ -113,7 +115,7 @@ class Decoder:
     def pair(self):
         return dict(binding=self.uid(),entity=self.uid(),worker=self.text(),identity=self.text(),seed=self.read('q'),dimension=self.text(),kind=self.read('B'),interest=self.read('?'))
     def response(self):
-        assert (self.read('I'),self.read('B'),self.read('B'))==(0x46434556,1,2)
+        assert (self.read('I'),self.read('B'),self.read('B'))==(0x46434556,2,2)
         result=dict(sequence=self.read('q'),boot=self.uid())
         result['owned']=[self.pair() for _ in range(self.read('I'))]
         viewers=[]
@@ -127,6 +129,7 @@ class Decoder:
                 v['samples'].append(dict(pair=pair,state=state,instance=self.uid(),sequence=self.read('q'),remaining=self.read('q')))
             viewers.append(v)
         result['viewers']=viewers
+        result['interests']=[dict(uuid=self.uid(),name=self.text(),dimension=self.text(),x=self.read('d'),y=self.read('d'),z=self.read('d')) for _ in range(self.read('I'))]
         assert self.stream.read()==b'', 'Unexpected trailing response data'
         return result
 
@@ -139,8 +142,8 @@ def heartbeat(w, **overrides):
 def action(w, name, **extra):
     return request('/api/agent/entity-views',dict(workerId=w,instance=instances[w],action=name,**extra),True)
 
-def exchange(w, seq, states=(), players=()):
-    status,body=action(w,'exchange',bundle=bundle(seq,states,players))
+def exchange(w, seq, states=(), players=(), automatic=False):
+    status,body=action(w,'exchange',bundle=bundle(seq,states,players,automatic))
     assert status==200,(status,body)
     return Decoder(body['bundle']).response()
 
@@ -202,6 +205,26 @@ try:
     status=request('/api/entity-views/status')[1]
     check(status['paired']==0 and status['fresh']==0,'Old in-flight frame cannot resurrect unpaired view')
     check(status['entityOwnershipTransfer'] is False and status['remotePickup'] is False,'Status never claims gameplay ownership or pickup')
+    # Automatic discovery uses one worker-mode flag, never manual per-entity pairing.
+    check(action('worker-002','view',operatorName='Viewer',playerUuid=str(viewer),enabled='true')[0]==200,'Opt in to automatic views')
+    exchange('worker-002',9,players=[pos],automatic=True)
+    interests=exchange('worker-001',6,automatic=True)['interests']
+    check(len(interests)==1 and interests[0]['uuid']==viewer,'Manager offers a remote interest location for automatic source discovery')
+    new_uuid=uuid.uuid4()
+    auto_name=('foundations:entity-preview:auto-v1:worker-001:'+str(new_uuid)).encode()
+    raw=bytearray(hashlib.md5(auto_name).digest());raw[6]=(raw[6]&15)|48;raw[8]=(raw[8]&63)|128
+    auto_binding=uuid.UUID(bytes=bytes(raw))
+    auto_state=encode_state(auto_binding,new_uuid,3.)
+    check(action('worker-002','exchange',bundle=bundle(10,[encode_state(uuid.uuid4(),new_uuid)],[],True))[0] in (403,409),'Non-owner cannot publish automatically')
+    check(action('worker-001','exchange',bundle=bundle(7,[encode_state(uuid.uuid4(),new_uuid)],[],True))[0] in (403,409),'Fake automatic binding refused')
+    response=exchange('worker-001',7,[auto_state],automatic=True)
+    check(response['owned'][0]['entity']==new_uuid and response['owned'][0]['interest'],'Source auto record is ephemeral and wanted by remote viewer')
+    viewer_reply=exchange('worker-002',10,players=[pos],automatic=True)
+    check(viewer_reply['viewers'][0]['samples'][0]['state']['entity']==new_uuid,'Automatic UUID appears on destination without manual pair')
+    state=request('/api/entity-views/status')[1]
+    check(state['paired']==0 and state['automaticFresh']==1,'Auto view never creates durable pairing metadata')
+    exchange('worker-001',8,automatic=True)
+    check(exchange('worker-002',11,players=[pos],automatic=True)['viewers'][0]['samples']==[],'Absent entity removed from remote presentation')
     success=True
     print(f'Entity-view Manager HTTP contract: PASS ({checks} checks; synthetic agent reports, no Minecraft entity transfer)')
 finally:

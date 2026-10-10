@@ -37,6 +37,41 @@ public final class EntityViewGameTests {
         try{action.run();}catch(IOException|IllegalArgumentException|IllegalStateException ex){return;}h.fail("Invalid paired-entity operation was accepted");
     }
     private static long count(ServerLevel level){long n=0;for(Entity ignored:level.getAllEntities())n++;return n;}
+    @GameTest(template="empty") public static void autoEntityDiscoveryFindsLoadedCowWithoutPair(GameTestHelper h)throws Exception {
+        var c=cow(h);h.getLevel().addFreshEntity(c);
+        long count=count(h.getLevel());
+        var viewer=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
+        var data=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(viewer),Set.of(),e->true,4);
+        h.assertTrue(data.states().size()==1&&data.states().getFirst().entity().equals(c.getUUID()),"Loaded native cow discovered without manual pair");
+        h.assertTrue(data.states().getFirst().binding().equals(com.foundations.cluster.protocol.EntityViewsWire.autoBinding("worker-001",c.getUUID())),"Auto binding stable from worker/UUID");
+        h.assertTrue(count(h.getLevel())==count && !c.isRemoved(),"No entity created, removed or modified by discovery");h.succeed();
+    }
+    @GameTest(template="empty") public static void autoEntityDiscoveryEnforcesAuthorityAndDistance(GameTestHelper h)throws Exception {
+        var c=cow(h);h.getLevel().addFreshEntity(c);
+        var origin=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
+        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(),e->false,4).states().isEmpty(),"Unowned entities never sent");
+        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(origin),Set.of(c.getUUID()),e->true,4).states().isEmpty(),"Manual pairing takes precedence");
+        var far=new Player(UUID.randomUUID(),"Far","minecraft:overworld",c.getX()+1000,c.getY(),c.getZ());
+        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(far),Set.of(),e->true,4).states().isEmpty(),"Far entity is not disclosed");
+        var other=new Player(UUID.randomUUID(),"Dimension","minecraft:the_nether",c.getX(),c.getY(),c.getZ());
+        h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(other),Set.of(),e->true,4).states().isEmpty(),"Dimension isolation");h.succeed();
+    }
+    @GameTest(template="empty") public static void autoEntityDiscoveryDoesNotPairUnsupportedPig(GameTestHelper h)throws Exception {
+        var c=cow(h);h.getLevel().addFreshEntity(c);
+        var pig=EntityType.PIG.create(h.getLevel());pig.setPos(c.getX()+1,c.getY(),c.getZ());h.getLevel().addFreshEntity(pig);
+        var center=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
+        var views=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(center),Set.of(),e->true,4);
+        h.assertTrue(views.states().size()==1&&views.states().getFirst().entity().equals(c.getUUID()),"Unsupported entity type stays untouched/unpaired");
+        h.assertTrue(h.getLevel().getEntity(pig.getUUID())==pig,"Pig stays a normal independent native entity");h.succeed();
+    }
+    @GameTest(template="empty") public static void autoEntityDiscoveryBoundedNearestStable(GameTestHelper h)throws Exception {
+        var one=cow(h);h.getLevel().addFreshEntity(one);
+        var two=EntityType.COW.create(h.getLevel());two.setNoAi(true);two.setPos(one.getX()+3,one.getY(),one.getZ());h.getLevel().addFreshEntity(two);
+        var pos=new Player(UUID.randomUUID(),"Observer",one.level().dimension().location().toString(),one.getX(),one.getY(),one.getZ());
+        var a=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(pos),Set.of(),e->true,1);
+        var b=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(pos),Set.of(),e->true,1);
+        h.assertTrue(a.states().size()==1&&a.skipped()>=1&&a.states().equals(b.states()),"Nearest, bounded results stable across scans");h.succeed();
+    }
     @GameTest(template="empty") public static void entityViewCapturePreservesSourceAndDirtyTracker(GameTestHelper h)throws Exception {
         var cow=cow(h);cow.getEntityData().packDirty();cow.setCustomName(Component.literal("R2 cow"));cow.setAge(-1200);cow.setHealth(7);cow.setYRot(90);cow.setXRot(15);cow.setYHeadRot(45);cow.setDeltaMovement(.1,.2,.3);
         var state=EntityViewPackets.capture(cow,UUID.randomUUID());

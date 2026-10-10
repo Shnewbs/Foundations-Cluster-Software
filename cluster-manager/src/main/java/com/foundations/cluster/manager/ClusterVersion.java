@@ -2,7 +2,7 @@ package com.foundations.cluster.manager;
 
 final class ClusterVersion {
     static final String VERSION = "0.0.6a.R19";
-    static final String NODE_VERSION = "0.0.6a.R16";
-    static final String PACKAGE_REVISION = "0.0.7a-dev.2.R2";
+    static final String NODE_VERSION = "0.0.6a.R17";
+    static final String PACKAGE_REVISION = "0.0.7a-dev.2.R3";
     private ClusterVersion() {}
 }
