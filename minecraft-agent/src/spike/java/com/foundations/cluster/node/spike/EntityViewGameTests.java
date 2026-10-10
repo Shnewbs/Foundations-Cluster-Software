@@ -86,7 +86,8 @@ public final class EntityViewGameTests {
             // State contains a byte[]; Java record/list equals would compare that array by reference.
             h.assertTrue(a.states().size()==1&&b.states().size()==1&&a.skipped()==1&&b.skipped()==1,
                 "Two loaded authoritative cows produce one bounded nearest result, not zero");
-            var s=a.states().getFirst(),t=b.states().getFirst();
+            var s=a.states().getFirst();
+            var t=b.states().getFirst();
             h.assertTrue(s.entity().equals(one.getUUID())&&t.entity().equals(one.getUUID())&&s.binding().equals(t.binding())&&
                 Arrays.equals(s.metadata(),t.metadata()),"Nearest UUID and metadata bytes are stable across scans");h.succeed();
         });
