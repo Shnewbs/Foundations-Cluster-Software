@@ -67,7 +67,7 @@ public final class PickupTransferLedgerSelfTest {
         Path file=dir.resolve("pickup-transfers-v1.bin");byte[] good=Files.readAllBytes(file),bad=good.clone();bad[bad.length-1]^=127;
         Files.write(file,bad);rejected(()->new PickupTransferLedger(dir));Files.write(file,good);
         Path killed=Files.createTempDirectory("foundations-pickup-killed-");kill(killed);
-        try(var l=new PickupTransferLedger(killed)){
+        try(var l=reopenAfterKilledChild(killed)){
             var e=l.view(ID).orElseThrow();ok(e.phase()==Phase.WORLD_COMMITTED&&e.committed()==12,"Killed JVM cannot undo durable world consumption");
             rejected(()->l.abort(ID));
             ok(l.commitPlayer(ID,12,WORLD,PLAYER).phase()==Phase.PLAYER_COMMITTED,"Recovery reconciles unfinished player grant");
@@ -79,6 +79,17 @@ public final class PickupTransferLedgerSelfTest {
             rejected(()->l.commitWorld(early,1,2,WORLD));
         }
         System.out.println("Pickup effect durable reference: PASS ("+checks+" checks; 1 killed JVM; no live inventory or entity adapter)");
+    }
+    private static PickupTransferLedger reopenAfterKilledChild(Path directory)throws Exception {
+        IOException busy=null;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        do {
+            try{return new PickupTransferLedger(directory);}
+            catch(IOException e){
+                if(!String.valueOf(e.getMessage()).contains("already open"))throw e;
+                busy=e;Thread.sleep(40);
+            }
+        }while(System.nanoTime()<deadline);
+        throw busy;
     }
     private static void kill(Path dir)throws Exception {
         String java=Path.of(System.getProperty("java.home"),"bin","java").toString();
