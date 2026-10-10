@@ -158,7 +158,7 @@ public final class EntityViewGameTests {
         h.assertTrue(item.getItem().getCount()==17&&!item.isRemoved(),"Source item remains untouched");renderer.clear();h.succeed();
     }
     @GameTest(template="empty") public static void entityViewRejectsUnsupportedEntitiesAndPassengers(GameTestHelper h)throws Exception {
-        var pig=EntityType.PIG.create(h.getLevel());rejects(h,()->EntityViewPackets.capture(pig,UUID.randomUUID()));
+        var rabbit=EntityType.RABBIT.create(h.getLevel());rejects(h,()->EntityViewPackets.capture(rabbit,UUID.randomUUID()));
         var cow=cow(h);var boat=EntityType.BOAT.create(h.getLevel());h.assertTrue(cow.startRiding(boat,true),"Passenger fixture mounted");
         rejects(h,()->EntityViewPackets.capture(cow,UUID.randomUUID()));h.assertTrue(cow.getVehicle()==boat,"Unsupported relation is never silently detached");h.succeed();
     }
