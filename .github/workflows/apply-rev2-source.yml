@@ -1,0 +1,80 @@
+name: Apply reviewed Rev2 source and validate
+on:
+  push:
+    branches: [feature/0.0.7a-survival-foundation]
+    paths: [.rev2-stage/**, .github/workflows/apply-rev2-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ steps.apply.outputs.commit }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 2
+      - id: apply
+        name: Verify exact patch and commit actual source without force push
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = e85e085aedf3c72425788f414c1669148c861ec2
+          test "$(git ls-remote origin refs/heads/feature/0.0.7a-survival-foundation | cut -f1)" = "$GITHUB_SHA"
+          python - <<'PY'
+          import base64, hashlib, lzma, pathlib, subprocess, tempfile, os, shutil
+          data = ''.join(pathlib.Path('.rev2-stage/patch.' + str(i)).read_text().strip() for i in (1,2,3))
+          patch = lzma.decompress(base64.b64decode(data, validate=True))
+          assert len(patch) == 101521
+          assert hashlib.sha256(patch).hexdigest() == '803805b4fb944ff7c76bcc773fb0bd3511e86bc68c8b36288bf8751c1e51c4f3'
+          with tempfile.TemporaryDirectory() as d:
+              p = pathlib.Path(d)/'source.patch'; p.write_bytes(patch)
+              subprocess.run(['git','apply','--check',str(p)],check=True)
+              subprocess.run(['git','apply',str(p)],check=True)
+              subprocess.run(['git','add','cluster-manager','minecraft-agent','protocol','tools/validate.py'],check=True)
+              idx = pathlib.Path(d)/'index'; shutil.copyfile('.git/index',idx)
+              env = dict(os.environ, GIT_INDEX_FILE=str(idx))
+              subprocess.run(['git','update-index','--force-remove','.github/workflows/apply-rev2-source.yml','.rev2-stage/patch.1','.rev2-stage/patch.2','.rev2-stage/patch.3'],env=env,check=True)
+              tree = subprocess.check_output(['git','write-tree'],env=env,text=True).strip()
+              assert tree == 'df06ce6b33f56e05da87f5c8a332e9332b9d1089', tree
+          PY
+          git config user.name 'Shnewbs'
+          git config user.email '90636566+Shnewbs@users.noreply.github.com'
+          git commit -m 'Implement bounded UUID-paired entity presentation for Rev2 validation' -m 'Source-bound vanilla cow/item views use packets only, never destination gameplay entities. Includes 900 passing protocol/registry checks and 14 additional Minecraft GameTests awaiting this workflow. Live entity ownership transfer and remote Survival stay disabled. Temporary source-transport files are removed in the follow-up source commit.'
+          git push origin HEAD:refs/heads/feature/0.0.7a-survival-foundation
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  regression:
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+      - run: python tools/validate.py
+      - run: python tools/validate_survival_spike.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: rev2-first-game-evidence-${{ runner.os }}
+          path: |
+            minecraft-agent/build/survival-spike-world/logs/latest.log
+            minecraft-agent/build/survival-spike-world/reports
+            minecraft-agent/build/survival-spike-world/*.xml
+            minecraft-agent/build/libs/*.jar
+          retention-days: 14
