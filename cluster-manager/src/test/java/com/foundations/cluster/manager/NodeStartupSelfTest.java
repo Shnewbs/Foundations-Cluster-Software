@@ -21,7 +21,7 @@ public final class NodeStartupSelfTest {
   Properties build=new Properties();try(var in=Files.newInputStream(Path.of(args[0],"minecraft-agent/gradle.properties"))){build.load(in);}
   check(ClusterVersion.NODE_VERSION.equals(build.getProperty("mod_version")),"Manager/Gradle release parity");
   check(ClusterVersion.NODE_VERSION.equals("0.0.6a.R19"),"R19 required");
-  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.7a-dev.2.R5"),"repair package marker");
+  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.7a-dev.2.R6"),"repair package marker");
   Path home=Files.createTempDirectory("foundations-nodefix-");
   try{
    Files.createDirectories(home.resolve("config"));Files.writeString(home.resolve("config/cluster.properties"),"worker.templateDir=custom template\nworld.seed=1234\nworld.identity.enforce=false\nworld.environment.enabled=false\n");

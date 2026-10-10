@@ -8,20 +8,59 @@ import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 version=re.search(r'PACKAGE_REVISION = "([^"]+)"',(ROOT/'cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java').read_text()).group(1)
-assert version=='0.0.7a-dev.2.R5','Review updater compatibility before changing the package version'
-paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html","web/operations.js","web/operations.css","web/styles.css","web/icons.svg","web/features.json","web/worker-controls.js","web/worker-controls.css","minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R19.jar"]
-# The applicator must authorize exactly the payload paths, including rollback of new UI files.
-applicator=(ROOT/'tools/apply_update.ps1').read_text()
-allowed=re.search(r'\$allowed\s*=\s*@\(([^\n]+)\)',applicator).group(1)
-assert paths==re.findall(r"'([^']+)'",allowed),'Updater payload and rollback allowlist differ'
-assert len(paths)==len(set(paths)), 'Duplicate payload path'
-assert '/worker-controls.js' in (ROOT/'web/operations.js').read_text(), 'Worker controls loader missing'
-assert '/worker-controls.css' in (ROOT/'web/operations.js').read_text(), 'Worker control styles loader missing'
-manager=ROOT/'cluster-manager/build/FoundationsClusterManager.jar'
-with zipfile.ZipFile(manager) as jar:
-    data=jar.read('com/foundations/cluster/manager/ClusterVersion.class')
-    assert data[:4]==bytes.fromhex('cafebabe') and version.encode() in data,'Build the matching Manager first'
-    assert int.from_bytes(data[6:8],'big')==65,'Manager must target Java 21'
+assert version=='0.0.7a-dev.2.R6','Review updater compatibility before changing the package version'
+# Cumulative application overlay: bring every supported old source/build-script
+# baseline forward in one step. Never package operator state, world data, server
+# templates or runtime. Take the inventory from the exact Git checkout in CI.
+import subprocess
+SAFE_TOP={
+    'tools','cluster-manager','minecraft-agent','web','velocity-gateway','protocol',
+    'playtest','node-simulator','reference','desktop','docs','licenses','release',
+    'release_notes','tests',
+}
+BUILT={
+    'cluster-manager/build/FoundationsClusterManager.jar',
+    'velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar',
+    'velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar',
+    'minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R19.jar',
+}
+PROTECTED_TOP={'runtime','workers','server-template','logs','update-backups','config','velocity'}
+def approved_source(path):
+    if not path or path.startswith('.') or '..' in Path(path).parts or any(c in path for c in ('\\','//',':')):
+        return False
+    bits=path.split('/')
+    if bits[0] in PROTECTED_TOP or path in BUILT or 'build' in bits or 'dist' in bits:
+        return False
+    if bits[0] in SAFE_TOP:
+        return True
+    return len(bits)==1 and (path.endswith(('.bat','.sh','.md','.txt')))
+try:
+    # Github Actions includes the checkout metadata. Fail closed if missing:
+    # users should use the prebuilt updater, not package arbitrary local files.
+    raw=subprocess.check_output(['git','-C',str(ROOT),'ls-files','-z'],stderr=subprocess.DEVNULL)
+    tracked=[p.decode('utf-8') for p in raw.split(b'\x00') if p]
+except (OSError,subprocess.CalledProcessError):
+    raise SystemExit('Build the cumulative installer from a clean Git checkout; ordinary users should use the release updater.')
+app_sources=sorted(p for p in tracked if approved_source(p))
+paths=sorted(set(app_sources)|BUILT)
+assert len(paths)>=300,'Incomplete cumulative source inventory'
+assert len(paths)==len(set(paths)) and all(p.isascii() and (ROOT/p).is_file() for p in paths), 'Missing or unsafe app files'
+for must in ('tools/ensure_jdk21.ps1','tools/setup_velocity.ps1','minecraft-agent/gradle.properties',
+             'minecraft-agent/build.gradle','minecraft-agent/build_mod.bat',
+             'minecraft-agent/src/main/templates/FoundationsClusterNode.java.template',
+             'cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java'):
+    assert must in paths, 'Cumulative upgrade missing required source/build file: '+must
+
+# Ship an *exact* hardcoded allowlist in the applicator. A tampered manifest
+# cannot request changing config/, runtime/, worlds, arbitrary source paths etc.
+applicator_template=(ROOT/'tools/apply_update.ps1').read_text()
+token="'__PACKAGE_ALLOWLIST__'"
+assert applicator_template.count(token)==1, 'Upgrader allowlist template invalid'
+allowlist=',\n'.join("'"+p+"'" for p in paths)
+applicator=applicator_template.replace(token,allowlist).encode('utf-8')
+
+def payload_bytes(path):
+    return applicator if path=='tools/apply_update.ps1' else (ROOT/path).read_bytes()
 # Fail packaging if a clean checkout did not actually compile the gateway.
 prefix='com/velocitypowered/proxy/connection/backend/'
 required=['SeamlessConfigSessionHandler.class','FoundationsHandshakeCapture.class',
@@ -51,8 +90,8 @@ with zipfile.ZipFile(ROOT/'minecraft-agent/build/libs/foundations_cluster_node-0
     mixins=json.loads(node.read('foundations_cluster_node.mixins.json'))['mixins']
     assert 'EntityDataSnapshotAccessor' in mixins and 'EntityIdAllocatorAccessor' in mixins
     assert not any('/spike/' in n or 'foundations_cluster_spike' in n for n in node.namelist()), 'Test mod must not ship to operator worlds'
-files=[{'path':path,'sha256':hashlib.sha256((ROOT/path).read_bytes()).hexdigest()} for path in paths]
-manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'0.0.6a.R19-HF11 through HF16, original 0.0.7a-dev.2, or matching dev.2.R2/R3/R4/R5; stages Node R19','files':files}
+files=[{'path':path,'sha256':hashlib.sha256(payload_bytes(path)).hexdigest()} for path in paths]
+manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'Direct from R19-HF11 through HF16 or 7a-dev.2/R2-R6; all cumulative app files and prebuilt R19 Node, Manager, gateway' ,'upgradeMode':'cumulative','files':files}
 output=ROOT/'dist';output.mkdir(exist_ok=True)
 archive=output/f'FoundationsCluster-{version}-UPDATER.zip'
 launcher='''@echo off
@@ -70,9 +109,10 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
     z.write(ROOT/'docs/ENTITY_AUTO_DISCOVERY_R3_GUIDE.md','ENTITY_VIEWS_GUIDE.md')
     z.write(ROOT/'docs/ENTITY_TRANSFER_R4_GATES.md','ENTITY_TRANSFER_R4_GATES.md')
     z.write(ROOT/'docs/HANDOFF_AND_ENTITY_STATE_R5_GUIDE.md','R5_GUIDE.md')
+    z.write(ROOT/'docs/status/0_0_7A_DEV2_R6.md','DIRECT_UPGRADE_R6.md')
     z.write(ROOT/'tools/summarize_playtest.py','summarize_playtest.py')
-    z.write(ROOT/'tools/apply_update.ps1','tools/apply_update.ps1')
-    for path in paths:z.write(ROOT/path,'payload/'+path)
+    z.writestr('tools/apply_update.ps1',applicator)
+    for path in paths:z.writestr('payload/'+path,payload_bytes(path))
 digest=hashlib.sha256(archive.read_bytes()).hexdigest()
 (archive.with_suffix('.zip.sha256')).write_text(digest+'  '+archive.name+'\n',encoding='ascii')
 print(archive)

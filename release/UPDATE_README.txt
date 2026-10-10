@@ -1,23 +1,21 @@
-Foundations Cluster 0.0.7a-dev.2.R4 / Node 0.0.6a.R18
-INSTALLABLE DEVELOPMENT REVISION: bounded vanilla cow/pig/sheep/chicken/item presentation plus reference-only ownership/pickup recovery ledgers.
-DISPLAY ONLY: no entity ownership transfer, remote pickup or remote Survival edits.
+Foundations Cluster 0.0.7a-dev.2.R6 — Cumulative updater (Minecraft 1.21.1 / NeoForge 21.1.250)
 
-Stop Manager, gateway and every worker. Use a stopped backup/test copy. Extract
-separately and run APPLY_UPDATE.bat, selecting the existing stopped Cluster folder.
-Keep the printed backup path. Start normally and confirm Node R18 on every worker.
-No additional mod ID or client mod is needed for the new presentation packets.
+This archive updates the *application files* needed for a direct upgrade from any
+supported R19-HF11 through HF16 installation or from dev.2/R2-R5. You do NOT need
+to install every intermediate release. It includes the current source/build scripts,
+Manager, Node, gateway and dashboard, rather than only replacing a few binaries.
 
-Accepts HF11-HF16, original dev.2 or dev.2.R2 or dev.2.R3 or exact dev.2.R4. Worlds, player saves, profiles,
-configuration, credentials, journals, reports and pair selections are excluded
-from the updater payload. Later Node synchronization and gateway runtime updates
-have their own separate backups.
+STOP all workers, gateway and Manager. BACK UP the entire Cluster folder; extract
+this archive to a separate folder. Run APPLY_UPDATE.bat and explicitly select the
+stopped Cluster installation folder shown in the startup logs. Confirm the printed
+"Installed 0.0.7a-dev.2.R6" message and backup location. Restart using your usual
+launcher and check the Manager log: package 0.0.7a-dev.2.R6, Node R19 on workers.
 
-Read ENTITY_VIEWS_GUIDE.md first. On the ACTIVE entity-owning worker, automatic discovery starts enabled.
-Use /foundations_entities auto off only as a debug safety switch. On the destination, opt in with
-/foundations_entities view on. No manual per-mob pairing is needed. Keep the
-source online and its region ownership unchanged. This is not a migration/failover test. Remote views
-cannot be interacted with; native entities are never merged by location.
+The updater backs up and restores each replaced application file, and never includes
+workers/, server-template/, runtime/, logs/, update-backups/, secrets or live config/.
+It does NOT migrate world data or enable cross-worker Survival or entity ownership.
+Keep backup files; rollback requires the matching R6 updater script and backup path.
+If any step fails, DO NOT start the cluster; read the updater error and rollback.
 
-PLAYTEST_GUIDE.md retains the prior dev.2 observer commands and report instructions.
-The recorder format itself has not changed. Match the installed package/Node to
-R4 as specified in ENTITY_VIEWS_GUIDE.md, not the older guide's version examples.
+This is a 7a DEVELOPMENT revision: remote Survival, inventory transactions, and
+entity ownership migration are still gated, even if the installer passes validation.

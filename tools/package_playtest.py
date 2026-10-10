@@ -9,7 +9,7 @@ import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.0.7a-dev.2.R5'
+VERSION = '0.0.7a-dev.2.R6'
 OUT = ROOT / 'development-dist'
 OUT.mkdir(exist_ok=True)
 report = ROOT / 'minecraft-agent/build/reports/survival-spike'
@@ -70,6 +70,7 @@ files = {
     'ENTITY_VIEWS_GUIDE.md': (ROOT/'docs/ENTITY_AUTO_DISCOVERY_R3_GUIDE.md').read_bytes(),
     'ENTITY_TRANSFER_R4_GATES.md': (ROOT/'docs/ENTITY_TRANSFER_R4_GATES.md').read_bytes(),
     'R5_GUIDE.md': (ROOT/'docs/HANDOFF_AND_ENTITY_STATE_R5_GUIDE.md').read_bytes(),
+    'DIRECT_UPGRADE_R6.md': (ROOT/'docs/status/0_0_7A_DEV2_R6.md').read_bytes(),
     'evidence/entity-protocol-registry-tests.log': ''.join(entity_logs).encode(),
     'PLAYTEST_GUIDE.md': (ROOT / 'docs/PLAYTEST_DEV2_GUIDE.md').read_bytes(),
     'summarize_playtest.py': (ROOT / 'tools/summarize_playtest.py').read_bytes(),

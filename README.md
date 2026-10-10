@@ -13,3 +13,13 @@ Download the uniquely versioned R5 installer from GitHub Releases, shut down **a
 [Entity auto-discovery test guide](docs/ENTITY_AUTO_DISCOVERY_R3_GUIDE.md) and [R5 status](docs/status/0_0_7A_DEV2_R5.md) distinguish verified tests from live gameplay acceptance. The `TEST-TOOLS` archive carries exact source and test evidence. `python tools/validate.py` runs Java/HTTP/UI regressions; `python tools/validate_survival_spike.py` runs disposable NeoForge GameTests. The legacy offline mapped build helper is not the ordinary supported build path.
 
 Source stays in draft PR #3 while live Survival and entity migration remain incomplete. Earlier releases are never overwritten. Frozen architecture remains unchanged.
+
+## Cumulative R6 installer
+
+For an existing R19-HF11–HF16 or 7a development installation, download the
+**0.0.7a-dev.2.R6 cumulative updater**, stop all cluster processes and apply it
+**once** to the existing installation. The R6 payload includes the latest
+application source/build scripts and tested compiled binaries. Older separate
+hotfixes are not prerequisites. Keep the whole-folder backup and the per-update
+rollback path; do not overwrite or replace operator config, worlds or security
+files with a source ZIP. This release is still development-only, not finished 7a.
