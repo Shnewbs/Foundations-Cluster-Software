@@ -1,36 +1,21 @@
-Foundations Cluster 0.0.6a.R19-HF16 / Node R14 (pre-release)
-Worker controls and recovery hardening
+Foundations Cluster 0.0.7a-dev.2.R6 — Cumulative updater (Minecraft 1.21.1 / NeoForge 21.1.250)
 
-INSTALL
-1. Stop Manager, gateway and every worker. Confirm the Java processes have exited.
-2. Extract this updater separately, not over the running installation.
-3. Run APPLY_UPDATE.bat and select the existing Cluster folder.
-4. Start Foundations normally, then refresh the dashboard with Ctrl+F5.
+This archive updates the *application files* needed for a direct upgrade from any
+supported R19-HF11 through HF16 installation or from dev.2/R2-R5. You do NOT need
+to install every intermediate release. It includes the current source/build scripts,
+Manager, Node, gateway and dashboard, rather than only replacing a few binaries.
 
-Accepts HF11 through HF16. Includes the compiled Manager, R19 gateway artifacts,
-Node R14, and the complete dashboard script/style set. Manager installs the staged
-Node into its configured template and synchronizes stopped workers through the
-existing backup-preserving path. No Gradle download is needed for this updater.
+STOP all workers, gateway and Manager. BACK UP the entire Cluster folder; extract
+this archive to a separate folder. Run APPLY_UPDATE.bat and explicitly select the
+stopped Cluster installation folder shown in the startup logs. Confirm the printed
+"Installed 0.0.7a-dev.2.R6" message and backup location. Restart using your usual
+launcher and check the Manager log: package 0.0.7a-dev.2.R6, Node R19 on workers.
 
-CONTROLS
-Restart Servers: rolling restart of managed Minecraft workers only; Manager and
-gateway stay online. Shutdown Cluster: closes Manager and its owned gateway and
-requests shutdown of managed workers; external processes are not terminated.
-Click a worker row to open details. Restart, Stop and Kill are adjacent actions.
-Stop is graceful and evacuation-aware. Kill immediately terminates the process
-and may lose unsaved world changes; it is an emergency action with confirmation.
+The updater backs up and restores each replaced application file, and never includes
+workers/, server-template/, runtime/, logs/, update-backups/, secrets or live config/.
+It does NOT migrate world data or enable cross-worker Survival or entity ownership.
+Keep backup files; rollback requires the matching R6 updater script and backup path.
+If any step fails, DO NOT start the cluster; read the updater error and rollback.
 
-DATA AND ROLLBACK
-Worlds, profiles, credentials, active configuration and runtime journals are not
-payload files. Existing application files are backed up before replacement.
-Keep this updater and the matching printed update-backups/HF16-... directory.
-Rollback with this updater's tools/apply_update.ps1 -ClusterRoot <installation>
--Rollback <matching backup path>. Older updater backups need their matching tools.
-Later Node/template synchronization and gateway runtime patches have separate
-backups. Never delete a world to resolve a Node version mismatch.
-
-LIMITS
-The recovery reference model is integrated in source, not connected to production
-Minecraft inventories. Remote Survival breaking and placement remain disabled.
-Browser tests use simulated workers; live-client and multi-worker acceptance
-remain separate. Read release_notes/0.0.6a.R19-HF16.md in the repository for scope.
+This is a 7a DEVELOPMENT revision: remote Survival, inventory transactions, and
+entity ownership migration are still gated, even if the installer passes validation.

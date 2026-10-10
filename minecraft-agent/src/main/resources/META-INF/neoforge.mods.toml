@@ -3,7 +3,7 @@ loaderVersion="[1,)"
 license="All Rights Reserved"
 [[mods]]
 modId="foundations_cluster_node"
-version="0.0.6a.R14"
+version="0.0.6a.R19"
 displayName="Foundations Cluster Node"
 displayTest="IGNORE_SERVER_VERSION"
 description="Server-side cluster worker agent with telemetry, region authority awareness, persistent-session state, and 0.0.6a dynamic scaling, cluster seed identity, persistence, player continuity, and graceful worker evacuation."

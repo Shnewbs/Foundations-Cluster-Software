@@ -16,6 +16,7 @@ final class ApiServer implements AutoCloseable {
     private final WorldEnvironmentCoordinator environment;
     private final SupportArchives support;
     private final TransferTrace transferTrace = new TransferTrace();
+    private final EntityViewService entityViews;
 
     ApiServer(ManagerConfig cfg, TokenStore tokens, AuthManager auth, AuditLog audit, WorkerManager workers, ScalingController scaling,
               TemplateManager templates, NodeAgentManager nodeAgent, StartupController startup, LayerPlanner layers, RegionAuthorityManager regions, PlayerStateManager playerStates, PlayerProfileManager playerProfiles, SessionManager sessions, HandoffManager handoffs, WorkerEvacuationManager evacuations, DataPlaneManager dataPlane, GatewayServer gateway,
@@ -23,6 +24,7 @@ final class ApiServer implements AutoCloseable {
         this.cfg=cfg;this.tokens=tokens;this.auth=auth;this.audit=audit;this.workers=workers;this.scaling=scaling;this.templates=templates;this.nodeAgent=nodeAgent;
         this.startup=startup;this.layers=layers;this.regions=regions;this.playerStates=playerStates;this.playerProfiles=playerProfiles;this.sessions=sessions;this.handoffs=handoffs;this.evacuations=evacuations;this.dataPlane=dataPlane;this.gateway=gateway;this.metrics=metrics;this.alerts=alerts;this.console=console;this.log=log;
         environment=new WorldEnvironmentCoordinator(cfg,log);
+        entityViews=new EntityViewService(cfg,workers,sessions,regions);
         support=new SupportArchives(cfg,log,limit->{
             Map<String,byte[]> captures=new LinkedHashMap<>(dataPlane.diagnosticSnapshots(limit));
             captures.put("summary.zip",DiagnosticBundle.create(cfg,workers,transferTrace));
@@ -41,6 +43,8 @@ final class ApiServer implements AutoCloseable {
         context("/api/console/execute",this::consoleExecute); context("/api/console/output",this::consoleOutput); context("/api/console/history",this::consoleHistory);
         context("/api/system/restart-workers",this::restartWorkers); context("/api/system/shutdown",this::shutdown);
         context("/api/agent/region-checkpoint",this::agentRegionCheckpoint); context("/api/agent/persistence/blocks",this::agentBlockBatch); context("/api/agent/register",this::agentRegister); context("/api/agent/heartbeat",this::agentHeartbeat); context("/api/agent/offline",this::agentOffline); context("/api/agent/player-state",this::agentPlayerState); context("/api/agent/player-restore",this::agentPlayerRestore); context("/api/agent/handoff",this::agentHandoffEndpoint); context("/api/agent/dataplane/publish",this::agentDataPlanePublish); context("/api/agent/dataplane/poll",this::agentDataPlanePoll); context("/api/agent/dataplane/ack",this::agentDataPlaneAck); context("/api/agent/persistence/replay",this::agentPersistenceReplay);
+        context("/api/agent/entity-views",this::agentEntityViews);
+        context("/api/entity-views/status",e->{if(admin(e))json(e,200,entityViews.status());});
         context("/api/alerts/acknowledge",this::acknowledgeAlert);
         context("/api/world/environment",e->{if(admin(e))json(e,200,environment.statusJson());});
         context("/api/host", e -> {if(admin(e))json(e,200,HostTelemetry.snapshot(cfg.home()));});
@@ -316,6 +320,18 @@ final class ApiServer implements AutoCloseable {
 
     private void agentDataPlanePublish(HttpExchange e)throws IOException{if(!agent(e)||!post(e))return;try{Map<String,String>m=Json.flatObject(body(e));DataPlaneFrame f=dataPlane.publish(m);json(e,202,"{\"ok\":true,\"frameId\":"+Json.q(f.id)+",\"targetWorkerId\":"+Json.q(f.targetWorkerId)+"}");}catch(Exception ex){json(e,409,"{\"error\":"+Json.q(ex.getMessage())+"}");}}
     private void agentDataPlanePoll(HttpExchange e)throws IOException{if(!agent(e)||!post(e))return;try{Map<String,String>m=Json.flatObject(body(e));String workerId=m.getOrDefault("workerId","").trim();int max=Json.i(m,"maxFrames",0);String bundle=dataPlane.pollBundle(workerId,max);json(e,200,"{\"ok\":true,\"bundle\":"+Json.q(bundle)+"}");}catch(Exception ex){json(e,400,"{\"error\":"+Json.q(ex.getMessage())+"}");}}
+    private void agentEntityViews(HttpExchange e)throws IOException {
+        if(!agent(e)||!post(e))return;
+        if(!e.getRequestURI().getPath().equals("/api/agent/entity-views")){json(e,404,"{}");return;}
+        try {
+            Map<String,String> m=Json.flatObject(body(e,1700000));
+            String result=entityViews.handle(m);
+            if(Set.of("pair","unpair","view").contains(m.getOrDefault("action","")))
+                audit.record("agent:"+m.getOrDefault("workerId",""),"ENTITY_VIEW_"+m.get("action").toUpperCase(Locale.ROOT),m.getOrDefault("entity",""),"display-only preview");
+            json(e,200,result);
+        }catch(SecurityException ex){json(e,403,"{\"error\":"+Json.q(ex.getMessage())+"}");}
+        catch(IllegalArgumentException | IllegalStateException | IOException ex){json(e,409,"{\"error\":"+Json.q(ex.getMessage())+"}");}
+    }
     private void agentDataPlaneAck(HttpExchange e)throws IOException{if(!agent(e)||!post(e))return;try{Map<String,String>m=Json.flatObject(body(e));dataPlane.ack(m.getOrDefault("workerId",""),m.getOrDefault("frameId",""),Json.b(m,"ok",true),m.getOrDefault("error",""));json(e,200,"{\"ok\":true}");}catch(Exception ex){json(e,400,"{\"error\":"+Json.q(ex.getMessage())+"}");}}
     private void agentPersistenceReplay(HttpExchange e)throws IOException {
         if(!agent(e)||!post(e))return;
@@ -459,5 +475,5 @@ final class ApiServer implements AutoCloseable {
     private static void text(HttpExchange e,int status,String s,String ct)throws IOException{byte[]d=s.getBytes(StandardCharsets.UTF_8);securityHeaders(e);e.getResponseHeaders().set("Content-Type",ct);e.getResponseHeaders().set("Cache-Control","no-store");e.sendResponseHeaders(status,d.length);try(OutputStream out=e.getResponseBody()){out.write(d);}}
     private static void securityHeaders(HttpExchange e){e.getResponseHeaders().set("X-Content-Type-Options","nosniff");e.getResponseHeaders().set("X-Frame-Options","DENY");e.getResponseHeaders().set("Referrer-Policy","no-referrer");e.getResponseHeaders().set("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");}
     private static String fmt(double d){return String.format(Locale.ROOT,"%.2f",d);}
-    public void close(){support.close();environment.close();server.stop(0);}
+    public void close(){entityViews.close();support.close();environment.close();server.stop(0);}
 }

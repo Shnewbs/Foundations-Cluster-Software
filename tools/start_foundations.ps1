@@ -7,6 +7,7 @@ $ConfigDir = Join-Path $Root "config"
 $ConfigFile = Join-Path $ConfigDir "cluster.properties"
 $DefaultConfig = Join-Path $ConfigDir "cluster.properties.default"
 $ExpectedVersion = "0.0.6a.R19"
+$ExpectedPackage = "0.0.7a-dev.2.R6"
 if (Test-Path -LiteralPath (Join-Path $Root 'runtime/update-in-progress.json')) {
     throw 'An update was interrupted. Use the updater rollback command and the backup recorded in runtime/update-in-progress.json before starting.'
 }
@@ -65,6 +66,7 @@ if(!$jdk21 -or $LASTEXITCODE -ne 0){throw 'Java 21 JDK discovery failed'}
 $env:JAVA_HOME=$jdk21
 $env:PATH=(Join-Path $jdk21 'bin')+';'+$env:PATH
 $javaCmd=[pscustomobject]@{Source=(Join-Path $jdk21 'bin\java.exe')}
+Write-Host "[Foundations Cluster] Package $ExpectedPackage (Manager/Node $ExpectedVersion)"
 Write-Host "[Foundations Cluster] Java 21: $($javaCmd.Source)"
 
 if (!(Test-Path $Bc)) { Write-Host "[Foundations Cluster] Missing cluster-manager\lib\bcprov.jar required for Argon2id security." -ForegroundColor Red; Read-Host "Press Enter to close"; exit 1 }

@@ -20,40 +20,40 @@ public final class NodeStartupSelfTest {
  public static void main(String[]args)throws Exception{
   Properties build=new Properties();try(var in=Files.newInputStream(Path.of(args[0],"minecraft-agent/gradle.properties"))){build.load(in);}
   check(ClusterVersion.NODE_VERSION.equals(build.getProperty("mod_version")),"Manager/Gradle release parity");
-  check(ClusterVersion.NODE_VERSION.equals("0.0.6a.R14"),"R14 required");
-  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.6a.R19-HF16"),"repair package marker");
+  check(ClusterVersion.NODE_VERSION.equals("0.0.6a.R19"),"R19 required");
+  check(ClusterVersion.PACKAGE_REVISION.equals("0.0.7a-dev.2.R6"),"repair package marker");
   Path home=Files.createTempDirectory("foundations-nodefix-");
   try{
    Files.createDirectories(home.resolve("config"));Files.writeString(home.resolve("config/cluster.properties"),"worker.templateDir=custom template\nworld.seed=1234\nworld.identity.enforce=false\nworld.environment.enabled=false\n");
    var cfg=ManagerConfig.load(home);var log=new ClusterLog(home.resolve("logs/test.log"),100);var templates=new TemplateManager(cfg,log);var node=new NodeAgentManager(cfg,templates,log);
-   String current="foundations_cluster_node-0.0.6a.R14.jar",old="foundations_cluster_node-0.0.6a.R11.jar";
+   String current="foundations_cluster_node-0.0.6a.R19.jar",old="foundations_cluster_node-0.0.6a.R11.jar";
    Path cache=home.resolve("minecraft-agent/build/libs"),mods=templates.templateDir().resolve("mods"),worker=home.resolve("workers/worker-001");
    check(!node.ready()&&node.state().equals("MISSING"),"missing Node blocks startup");
    jar(mods.resolve(old),"0.0.6a.R11");jar(cache.resolve(old),"0.0.6a.R11");
    check(node.state().equals("OUTDATED"),"R11 template is outdated");
-   check(node.builtJar()==null,"R11 cache is not R14");
-   jar(cache.resolve(current),"0.0.6a.R11");check(node.builtJar()==null,"R11 renamed to R14 rejected");
-   try{node.installBuiltJarIfPresent();throw new AssertionError("invalid artifact accepted");}catch(IOException e){check(e.getMessage().contains("Expected Cluster Node 0.0.6a.R14")&&e.getMessage().contains("embedded Node version is 0.0.6a.R11"),"specific wrong-metadata diagnostic");}
+   check(node.builtJar()==null,"R11 cache is not R19");
+   jar(cache.resolve(current),"0.0.6a.R11");check(node.builtJar()==null,"R11 renamed to R19 rejected");
+   try{node.installBuiltJarIfPresent();throw new AssertionError("invalid artifact accepted");}catch(IOException e){check(e.getMessage().contains("Expected Cluster Node 0.0.6a.R19")&&e.getMessage().contains("embedded Node version is 0.0.6a.R11"),"specific wrong-metadata diagnostic");}
    check(Files.exists(mods.resolve(old)),"failed preflight preserves installed old Node");
    Files.writeString(cache.resolve(current),"broken zip");check(node.builtJar()==null,"corrupt artifact rejected");
-   jar(cache.resolve(current),"0.0.6a.R14");check(node.mayAutoRetry(),"valid build usable without Gradle/script");
+   jar(cache.resolve(current),"0.0.6a.R19");check(node.mayAutoRetry(),"valid build usable without Gradle/script");
    node.buildAndInstallAsync();waitFor(node);
-   check(node.ready()&&node.state().equals("READY"),"R14 satisfies startup");
+   check(node.ready()&&node.state().equals("READY"),"R19 satisfies startup");
    check(node.installedJar().equals(mods.resolve(current)),"configured template used");
    check(!Files.exists(home.resolve("server-template")),"default template not created with custom config");
    check(!Files.exists(mods.resolve(old)),"old template duplicate removed");
    check(Files.isDirectory(home.resolve(".foundations_update_backups")),"old Node backed up");
-   check(node.statusJson().contains("\"version\":\"0.0.6a.R14\"")&&node.statusJson().contains("\"outdated\":false"),"dashboard reports current R14");
+   check(node.statusJson().contains("\"version\":\"0.0.6a.R19\"")&&node.statusJson().contains("\"outdated\":false"),"dashboard reports current R19");
    long before=Files.getLastModifiedTime(mods.resolve(current)).toMillis();node.buildAndInstallAsync();check(!node.building()&&Files.getLastModifiedTime(mods.resolve(current)).toMillis()==before,"already installed does not rebuild");
    Files.createDirectories(worker.resolve("mods"));jar(worker.resolve("mods/"+old),"0.0.6a.R11");Files.writeString(worker.resolve("mods/unrelated.jar"),"user mod");Files.createDirectories(worker.resolve("world"));Files.writeString(worker.resolve("world/level.dat"),"world fixture");
    try(WorkerManager workers=new WorkerManager(cfg,new TokenStore(home.resolve("runtime")),log,templates,node)){
     var sync=WorkerManager.class.getDeclaredMethod("syncClusterRuntimeFiles",Path.class);sync.setAccessible(true);sync.invoke(workers,worker);
-    check(NodeArtifact.isVersion(worker.resolve("mods/"+current),"0.0.6a.R14"),"stored worker receives R14");
+    check(NodeArtifact.isVersion(worker.resolve("mods/"+current),"0.0.6a.R19"),"stored worker receives R19");
     check(!Files.exists(worker.resolve("mods/"+old)),"stored worker old duplicate removed");
     jar(mods.resolve(current),"0.0.6a.R11");
     try { sync.invoke(workers,worker); throw new AssertionError("Renamed R11 accepted for stored worker"); }
     catch(java.lang.reflect.InvocationTargetException e) { check(e.getCause() instanceof IOException,"stored worker rejects template metadata mismatch"); }
-    check(NodeArtifact.isVersion(worker.resolve("mods/"+current),"0.0.6a.R14"),"failed worker sync preserves installed R14");
+    check(NodeArtifact.isVersion(worker.resolve("mods/"+current),"0.0.6a.R19"),"failed worker sync preserves installed R19");
     Files.copy(cache.resolve(current),mods.resolve(current),StandardCopyOption.REPLACE_EXISTING);
     check(Files.readString(worker.resolve("mods/unrelated.jar")).equals("user mod")&&Files.readString(worker.resolve("world/level.dat")).equals("world fixture"),"world/unrelated mod unchanged");
    }
@@ -63,9 +63,9 @@ public final class NodeStartupSelfTest {
    Files.createDirectories(home.resolve("tools"));Files.writeString(home.resolve("tools/ensure_gradle.ps1"),"# prerequisite fixture; build script does not invoke Gradle\n");
    for(int n=0;n<3;n++){node.buildAndInstallAsync();waitFor(node);}
    check(!node.mayAutoRetry()&&node.statusJson().contains("\"automaticBuildPaused\":true"),"three failed outputs pause automatic rebuilds");
-   check(node.statusJson().contains("Expected Cluster Node 0.0.6a.R14")&&node.statusJson().contains(old),"diagnostic includes expected/found files");
+   check(node.statusJson().contains("Expected Cluster Node 0.0.6a.R19")&&node.statusJson().contains(old),"diagnostic includes expected/found files");
    check(Files.readString(home.resolve("build-args.txt")).isEmpty(),"Manager build script is not passed --install");
-   jar(cache.resolve(current),"0.0.6a.R14");check(node.mayAutoRetry(),"valid artifact unblocks paused auto builds");node.buildAndInstallAsync();waitFor(node);
+   jar(cache.resolve(current),"0.0.6a.R19");check(node.mayAutoRetry(),"valid artifact unblocks paused auto builds");node.buildAndInstallAsync();waitFor(node);
    check(node.ready()&&node.statusJson().contains("\"buildFailures\":0"),"successful install resets failure count");
   }finally{try(var paths=Files.walk(home)){for(Path p:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(p);}}
   System.out.println("Node startup/deployment: PASS ("+checks+" checks; metadata/process fixtures, no Minecraft gameplay)");

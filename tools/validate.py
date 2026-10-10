@@ -24,7 +24,7 @@ def run(*cmd):
 def compile_to(destination, sources, cp=None):
     destination = ROOT / destination
     shutil.rmtree(destination, ignore_errors=True)
-    destination.mkdir(parents=True)
+    destination.mkdir(parents=True, exist_ok=True)
     argfile = destination.parent / (destination.name + '-sources.txt')
     argfile.write_text('\n'.join('"' + str(s.resolve()).replace('\\', '/') + '"' for s in sorted(sources)), encoding='utf-8')
     compiler = [a.java, '-jar', a.ecj, '-21', '-nowarn'] if a.ecj else [a.javac, '--release', '21']
@@ -32,7 +32,6 @@ def compile_to(destination, sources, cp=None):
     return destination
 
 def jar(classes, target, main):
-    # The standard ZIP/JAR manifest format avoids platform shell/quoting dependencies.
     target = ROOT / target
     target.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as archive:
@@ -49,19 +48,33 @@ manager_jar = jar(manager, 'cluster-manager/build/FoundationsClusterManager.jar'
 cp = os.pathsep.join(map(str, [manager_jar, bc]))
 tests = compile_to('cluster-manager/build/test-classes', ROOT.glob('cluster-manager/src/test/java/**/*.java'), cp)
 cp = os.pathsep.join([str(tests), cp])
-for name in ['R16SelfTest', 'R17SelfTest', 'R18SelfTest', 'R19SelfTest', 'NodeUpgradeSelfTest', 'NodeStartupSelfTest', 'R19HydrationSelfTest', 'SupportArchivesSelfTest', 'RestartAvailabilitySelfTest', 'HardeningSelfTest']:
+for name in ['R16SelfTest', 'R17SelfTest', 'R18SelfTest', 'R19SelfTest', 'NodeUpgradeSelfTest', 'NodeStartupSelfTest', 'R19HydrationSelfTest', 'SupportArchivesSelfTest', 'RestartAvailabilitySelfTest', 'HardeningSelfTest', 'EntityViewRegistrySelfTest', 'AutoEntityRegistrySelfTest']:
     run(a.java, '-cp', cp, 'com.foundations.cluster.manager.' + name, ROOT, *(['--fixture'] if name == 'NodeUpgradeSelfTest' else []))
+protocol = compile_to('protocol/build/test-classes', ROOT.glob('protocol/src/**/*.java'))
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.PlayerInventoryJournalSelfTest')
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.EntityViewsWireSelfTest')
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.EntityOwnershipLedgerSelfTest')
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.PickupTransferLedgerSelfTest')
 reference = compile_to('reference/build/classes', ROOT.glob('reference/src/**/*.java'))
 for name in ['transfer.RegionTransferCoordinatorSelfTest', 'persistence.PersistentRegionTransferSelfTest', 'replication.ReplicationProtocolSelfTest', 'replication.AuthorityResultJournalSelfTest']:
     run(a.java, '-cp', reference, 'com.foundations.cluster.' + name)
 node = compile_to('minecraft-agent/build/persistence-test-classes', [ROOT / f'minecraft-agent/src/main/java/com/foundations/cluster/node/{n}.java' for n in ['AuthorityHydration', 'RemoteTickLeases']] + [ROOT / f'tests/{n}SelfTest.java' for n in ['AuthorityHydration', 'RemoteTickLeases']])
 for name in ['AuthorityHydration', 'RemoteTickLeases']:
     run(a.java, '-cp', node, 'com.foundations.cluster.node.' + name + 'SelfTest')
+# Pure Java scheduler regression exercises the exact handoff preload coordinator
+# without loading any game world or requiring NeoForge dependencies.
+preload = compile_to('minecraft-agent/build/handoff-test-classes', [
+    ROOT / 'minecraft-agent/src/main/java/com/foundations/cluster/node/HandoffChunkPreloader.java',
+    ROOT / 'tests/HandoffChunkPreloaderSelfTest.java'])
+run(a.java, '-cp', preload, 'HandoffChunkPreloaderSelfTest')
 simulator = compile_to('node-simulator/build/classes', ROOT.glob('node-simulator/src/main/java/**/*.java'))
 jar(simulator, 'node-simulator/build/FoundationsClusterNodeSimulator.jar', 'com.foundations.cluster.simulator.Main')
 for test in sorted((ROOT / 'tests').glob('testlab_*_test.cjs')):
     run('node', test)
 if not a.skip_http:
-    for name in ['hydration_api_test.py', 'support_api_test.py', 'restart_api_test.py', 'security_api_test.py']:
+    for name in ['hydration_api_test.py', 'support_api_test.py', 'restart_api_test.py', 'security_api_test.py', 'entity_views_api_test.py']:
         run(sys.executable, ROOT / 'tests' / name, '--java', a.java)
+playtest = compile_to('playtest/build/test-classes', [ROOT / 'minecraft-agent/src/main/java/com/foundations/cluster/playtest/PlaytestTrace.java', ROOT / 'tests/PlaytestTraceSelfTest.java'])
+run(a.java, '-cp', playtest, 'com.foundations.cluster.playtest.PlaytestTraceSelfTest')
+run(sys.executable, ROOT / 'tests/playtest_report_test.py')
 print('Portable validation PASS. Live NeoForge/Conduit acceptance is a separate gate.', flush=True)

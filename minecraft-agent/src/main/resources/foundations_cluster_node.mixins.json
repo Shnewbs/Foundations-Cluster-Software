@@ -6,7 +6,9 @@
   "mixins": [
     "ChunkMutationMixin",
     "BlockEntitySealMixin",
-    "GrowthTickMixin"
+    "GrowthTickMixin",
+    "EntityDataSnapshotAccessor",
+    "EntityIdAllocatorAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

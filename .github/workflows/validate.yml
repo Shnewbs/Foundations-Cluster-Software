@@ -7,7 +7,7 @@ permissions:
   contents: read
 concurrency:
   group: validate-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feature/0.0.7a-survival-foundation' || github.head_ref == 'feature/0.0.7a-survival-foundation' }}
 jobs:
   regression:
     strategy:
@@ -46,6 +46,19 @@ jobs:
           path: source with spaces/minecraft-agent/build/reports/survival-spike/*
           if-no-files-found: warn
           retention-days: 14
+      - name: Package exact playtest tools and rerun trace JAR
+        if: runner.os == 'Linux'
+        run: python tools/package_playtest.py
+      - name: Preserve development playtest tools
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: survival-development
+          path: |
+            source with spaces/development-dist/*-TEST-TOOLS.zip
+            source with spaces/development-dist/*-TEST-TOOLS.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
       - name: Exercise Windows launch build scripts
         if: runner.os == 'Windows'
         shell: powershell
@@ -65,11 +78,17 @@ jobs:
       - name: Build updater from tested source
         if: runner.os == 'Windows'
         run: python tools/package_updater.py
-      - name: Validate updater transactions
+      - name: Validate cumulative upgrade against actual HF12 release and rollback
         if: runner.os == 'Windows'
         shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          & tests/updater_test.ps1 -Archive (Get-ChildItem dist/*-UPDATER.zip).FullName
+          $old = Join-Path $env:RUNNER_TEMP 'hf12-upgrade-fixture'
+          New-Item -ItemType Directory -Path $old -Force | Out-Null
+          gh release download 'v0.0.6a.R19-HF12' --repo $env:GITHUB_REPOSITORY --pattern 'FoundationsCluster-0.0.6a.R19-HF12-UPDATER.zip' --dir $old
+          if ($LASTEXITCODE -ne 0) { throw 'Could not retrieve official HF12 baseline' }
+          & tests/updater_test.ps1 -Archive (Get-ChildItem dist/*-UPDATER.zip).FullName -LegacyArchive (Join-Path $old 'FoundationsCluster-0.0.6a.R19-HF12-UPDATER.zip')
       - name: Save tested updater
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -102,5 +121,39 @@ jobs:
           if gh release view "v$version" >/dev/null 2>&1; then
             echo "Release v$version already exists; immutable assets left unchanged."
           else
-            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Worker controls and recovery" --notes-file "release_notes/$version.md"
+            gh release create "v$version" dist/* --target "$GITHUB_SHA" --prerelease --title "Foundations Cluster $version — Live playtest and recovery groundwork" --notes-file "release_notes/$version.md"
+          fi
+  development-release:
+    needs: regression
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/0.0.7a-survival-foundation'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: survival-development
+          path: development-dist
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-updater
+          path: development-dist
+      - name: Publish installable development playtest after both platform gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/feature/0.0.7a-survival-foundation" --jq '.object.sha')
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo 'A newer development candidate exists; keep this run as evidence only.'
+            exit 0
+          fi
+          if gh release view v0.0.7a-dev.2.R6 >/dev/null 2>&1; then
+            echo 'Existing development release is immutable; assets not replaced.'
+          else
+            gh release create v0.0.7a-dev.2.R6 development-dist/* --target "$GITHUB_SHA" --prerelease --latest=false --title 'Foundations Cluster 0.0.7a-dev.2.R6 — Direct cumulative upgrades (development)' --notes-file docs/status/0_0_7A_DEV2_R6.md
           fi
