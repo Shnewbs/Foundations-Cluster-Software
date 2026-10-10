@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: true
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Verify exact staged bytes, apply safely, remove staging, push source
         shell: bash
         run: |
