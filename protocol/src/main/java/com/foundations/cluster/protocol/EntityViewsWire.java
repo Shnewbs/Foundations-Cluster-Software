@@ -14,7 +14,7 @@ public final class EntityViewsWire {
     public static final double RADIUS = 64;
     public static final long FRESH_MILLIS = 1500, OPT_IN_MILLIS = 15 * 60 * 1000;
     private static final int MAGIC = 0x46434556, SCHEMA = 2;
-    public enum Kind { COW, ITEM }
+    public enum Kind { COW, ITEM, PIG, SHEEP, CHICKEN }
     /** Stable within a worker process and its world; not a gameplay-ownership ID.
      * Only exact UUIDs, never position/type/name heuristics, participate in discovery. */
     public static UUID autoBinding(String worker, UUID entity) {

@@ -13,7 +13,7 @@ import net.minecraft.world.phys.AABB;
 
 /** Repeated, interest-scoped observation of ALREADY-LOADED entities on a source.
  * Does not load chunks, construct replicas, mutate entities or claim new ownership.
- * V0 compatibility is deliberately limited to exact vanilla cows/dropped items;
+ * V0 compatibility is deliberately limited to certified vanilla species/items;
  * generic modded entity state/extra-spawn packets require a separate adapter. */
 public final class AutomaticEntityDiscovery {
     private AutomaticEntityDiscovery() {}

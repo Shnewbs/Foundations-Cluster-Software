@@ -63,16 +63,16 @@ public final class EntityViewGameTests {
             h.assertTrue(AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(other),Set.of(),e->e.getUUID().equals(c.getUUID()),4).states().isEmpty(),"Dimension isolation");h.succeed();
         });
     }
-    @GameTest(template="empty") public static void autoEntityDiscoveryDoesNotPairUnsupportedPig(GameTestHelper h)throws Exception {
+    @GameTest(template="empty") public static void autoEntityDiscoveryFiltersUnsupportedRabbit(GameTestHelper h)throws Exception {
         var c=cow(h);h.assertTrue(h.getLevel().addFreshEntity(c),"Cow fixture admitted");
-        var pig=EntityType.PIG.create(h.getLevel());pig.setPos(c.getX()+1,c.getY(),c.getZ());h.assertTrue(h.getLevel().addFreshEntity(pig),"Pig fixture admitted");
-        var fixtures=Set.of(c.getUUID(),pig.getUUID());
+        var rabbit=EntityType.RABBIT.create(h.getLevel());rabbit.setPos(c.getX()+1,c.getY(),c.getZ());h.assertTrue(h.getLevel().addFreshEntity(rabbit),"Rabbit fixture admitted");
+        var fixtures=Set.of(c.getUUID(),rabbit.getUUID());
         h.runAfterDelay(2,()->{
             var center=new Player(UUID.randomUUID(),"Observer",c.level().dimension().location().toString(),c.getX(),c.getY(),c.getZ());
             var views=AutomaticEntityDiscovery.collect(h.getLevel().getServer(),"worker-001",List.of(center),Set.of(),e->fixtures.contains(e.getUUID()),4);
             h.assertTrue(views.states().size()==1&&views.states().getFirst().entity().equals(c.getUUID()),
-                "Unsupported pig stays unpaired: actual views="+views.states().size());
-            h.assertTrue(h.getLevel().getEntity(pig.getUUID())==pig,"Pig remains an independent native entity");h.succeed();
+                "Uncertified rabbit stays unpaired: actual views="+views.states().size());
+            h.assertTrue(h.getLevel().getEntity(rabbit.getUUID())==rabbit,"Uncertified rabbit remains an independent native entity");h.succeed();
         });
     }
     @GameTest(template="empty") public static void autoEntityDiscoveryBoundedNearestStable(GameTestHelper h)throws Exception {
@@ -91,6 +91,26 @@ public final class EntityViewGameTests {
             h.assertTrue(s.entity().equals(one.getUUID())&&t.entity().equals(one.getUUID())&&s.binding().equals(t.binding())&&
                 Arrays.equals(s.metadata(),t.metadata()),"Nearest UUID and metadata bytes are stable across scans");h.succeed();
         });
+    }
+    @GameTest(template="empty") public static void entityViewsAdditionalVanillaSpeciesPacketRoundTrip(GameTestHelper h)throws Exception {
+        var entities=List.of(EntityType.PIG.create(h.getLevel()),EntityType.SHEEP.create(h.getLevel()),EntityType.CHICKEN.create(h.getLevel()));
+        var expected=List.of(Kind.PIG,Kind.SHEEP,Kind.CHICKEN);
+        for(int i=0;i<entities.size();i++) {
+            Entity e=entities.get(i);e.setPos(h.absolutePos(new BlockPos(i+1,2,1)).getCenter());
+            var snapshot=EntityViewPackets.capture(e,UUID.randomUUID());
+            int id=EntityViewPackets.allocateId();var spawn=EntityViewPackets.spawn(snapshot,id);
+            h.assertTrue(snapshot.kind()==expected.get(i)&&spawn.getType()==e.getType()&&spawn.getUUID().equals(e.getUUID()),
+                "Certified vanilla species captures its exact type and UUID");
+            h.assertTrue(EntityViewPackets.metadata(snapshot,id,h.getLevel().registryAccess()).id()==id,
+                "Full native synchronized data decodes for species");
+        }
+        h.succeed();
+    }
+    @GameTest(template="empty") public static void entityViewsAdditionalSpeciesRejectUnsafePassengers(GameTestHelper h)throws Exception {
+        var pig=EntityType.PIG.create(h.getLevel());var boat=EntityType.BOAT.create(h.getLevel());
+        h.assertTrue(pig.startRiding(boat,true),"Mounted pig fixture");
+        rejects(h,()->EntityViewPackets.capture(pig,UUID.randomUUID()));
+        h.assertTrue(pig.getVehicle()==boat,"Reject leaves native mount linkage intact");h.succeed();
     }
     @GameTest(template="empty") public static void entityViewCapturePreservesSourceAndDirtyTracker(GameTestHelper h)throws Exception {
         var cow=cow(h);cow.getEntityData().packDirty();cow.setCustomName(Component.literal("R2 cow"));cow.setAge(-1200);cow.setHealth(7);cow.setYRot(90);cow.setXRot(15);cow.setYHeadRot(45);cow.setDeltaMovement(.1,.2,.3);

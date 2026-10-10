@@ -15,6 +15,9 @@ import net.minecraft.network.protocol.game.*;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.animal.Sheep;
+import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.Vec3;
 
@@ -27,7 +30,10 @@ public final class EntityViewPackets {
             throw new IllegalArgumentException("Removed entities, passengers, vehicles and leashes are not supported by the paired-view preview");
         if(entity.getType()==EntityType.COW && entity.getClass()==Cow.class)return Kind.COW;
         if(entity.getType()==EntityType.ITEM && entity.getClass()==ItemEntity.class)return Kind.ITEM;
-        throw new IllegalArgumentException("Pair preview supports vanilla cows and dropped items only");
+        if(entity.getType()==EntityType.PIG && entity.getClass()==Pig.class)return Kind.PIG;
+        if(entity.getType()==EntityType.SHEEP && entity.getClass()==Sheep.class)return Kind.SHEEP;
+        if(entity.getType()==EntityType.CHICKEN && entity.getClass()==Chicken.class)return Kind.CHICKEN;
+        throw new IllegalArgumentException("No certified vanilla packet adapter for this entity");
     }
     public static State capture(Entity entity,UUID binding)throws IOException {
         Kind kind=supported(entity);
@@ -66,7 +72,13 @@ public final class EntityViewPackets {
     }
     public static ClientboundAddEntityPacket spawn(State s,int id) {
         return new ClientboundAddEntityPacket(id,s.entity(),s.x(),s.y(),s.z(),s.pitch(),s.yaw(),
-            s.kind()==Kind.COW?EntityType.COW:EntityType.ITEM,0,new Vec3(s.vx(),s.vy(),s.vz()),s.headYaw());
+            switch(s.kind()) {
+                case COW -> EntityType.COW;
+                case ITEM -> EntityType.ITEM;
+                case PIG -> EntityType.PIG;
+                case SHEEP -> EntityType.SHEEP;
+                case CHICKEN -> EntityType.CHICKEN;
+            },0,new Vec3(s.vx(),s.vy(),s.vz()),s.headYaw());
     }
     // These two packet types have entity-taking constructors in 1.21.1. Decode
     // their pinned vanilla wire form rather than constructing a fake world object.

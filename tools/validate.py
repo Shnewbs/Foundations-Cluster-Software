@@ -53,6 +53,8 @@ for name in ['R16SelfTest', 'R17SelfTest', 'R18SelfTest', 'R19SelfTest', 'NodeUp
 protocol = compile_to('protocol/build/test-classes', ROOT.glob('protocol/src/**/*.java'))
 run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.PlayerInventoryJournalSelfTest')
 run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.EntityViewsWireSelfTest')
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.EntityOwnershipLedgerSelfTest')
+run(a.java, '-cp', protocol, 'com.foundations.cluster.protocol.PickupTransferLedgerSelfTest')
 reference = compile_to('reference/build/classes', ROOT.glob('reference/src/**/*.java'))
 for name in ['transfer.RegionTransferCoordinatorSelfTest', 'persistence.PersistentRegionTransferSelfTest', 'replication.ReplicationProtocolSelfTest', 'replication.AuthorityResultJournalSelfTest']:
     run(a.java, '-cp', reference, 'com.foundations.cluster.' + name)

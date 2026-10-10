@@ -98,7 +98,7 @@ public final class PairedEntityViews implements AutoCloseable {
             automatic=enabled;remoteInterests=List.of();lastAttempt=0;
             if(!enabled) autoDiscovered=0;
             source.sendSuccess(()->Component.literal(enabled?
-                "Automatic entity discovery ON (loaded, authoritative vanilla cows/items only; display-only, no remote gameplay). Nearby viewers must still opt in with /foundations_entities view on.":
+                "Automatic entity discovery ON (loaded, authoritative supported vanilla cows/pigs/sheep/chickens/items only; display-only, no remote gameplay). Nearby viewers must still opt in with /foundations_entities view on.":
                 "Automatic entity discovery OFF. Automatic remote previews will expire; no real mobs/items are modified."),false);
             return 1;
         }catch(Exception e){return error(source,e);}

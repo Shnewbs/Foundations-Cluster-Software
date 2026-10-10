@@ -53,6 +53,11 @@ public final class EntityViewsWireSelfTest {
         rejects(()->new Pair(binding,id,"../worker","identity",0,"minecraft:overworld",Kind.COW,false));
         rejects(()->new Player(UUID.randomUUID(),"bad\nname","minecraft:overworld",0,0,0));
         rejects(()->EntityViewsWire.decodeRequest(new byte[EntityViewsWire.MAX_BYTES+1]));
+        for(Kind k:List.of(Kind.PIG,Kind.SHEEP,Kind.CHICKEN)) {
+            var newer=new State(binding,id,k,"minecraft:overworld",0,64,0,0,0,0,0,0,0,true,new byte[]{1});
+            var wire=EntityViewsWire.encodeRequest(new Request(1,List.of(newer),List.of(),true));
+            check(EntityViewsWire.decodeRequest(wire).states().getFirst().kind()==k,"Added vanilla kind wire round-trip");
+        }
         System.out.println("Entity view wire: PASS ("+checks+" checks)");
     }
 }

@@ -8,8 +8,8 @@ import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 version=re.search(r'PACKAGE_REVISION = "([^"]+)"',(ROOT/'cluster-manager/src/main/java/com/foundations/cluster/manager/ClusterVersion.java').read_text()).group(1)
-assert version=='0.0.7a-dev.2.R3','Review updater compatibility before changing the package version'
-paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html","web/operations.js","web/operations.css","web/styles.css","web/icons.svg","web/features.json","web/worker-controls.js","web/worker-controls.css","minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R17.jar"]
+assert version=='0.0.7a-dev.2.R4','Review updater compatibility before changing the package version'
+paths=["tools/start_foundations.ps1","cluster-manager/lib/bcprov.jar","cluster-manager/build/FoundationsClusterManager.jar","tools/setup_velocity.ps1","tools/build_gateway.ps1","velocity-gateway/build/libs/foundations_conduit_bridge-0.0.6a.R19.jar","velocity-gateway/build/libs/foundations_velocity_gateway-0.0.6a.R19.jar","tools/conduit-r15-patch/SeamlessConfigSessionHandler.java","tools/conduit-r15-patch/FoundationsHandshakeCapture.java","tools/conduit-r15-patch/FoundationsTagConfiguration.java","tools/conduit-r15-patch/FoundationsNeoForgeConfiguration.java","tools/conduit-r15-patch/GPL-3.0.txt","tools/conduit-r15-patch/README.txt","velocity-gateway/source/FoundationsVelocityGateway.java","velocity-gateway/resources/velocity-plugin.json","web/app.js","web/index.html","web/operations.js","web/operations.css","web/styles.css","web/icons.svg","web/features.json","web/worker-controls.js","web/worker-controls.css","minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R18.jar"]
 # The applicator must authorize exactly the payload paths, including rollback of new UI files.
 applicator=(ROOT/'tools/apply_update.ps1').read_text()
 allowed=re.search(r'\$allowed\s*=\s*@\(([^\n]+)\)',applicator).group(1)
@@ -38,8 +38,8 @@ with zipfile.ZipFile(ROOT/'velocity-gateway/build/libs/foundations_velocity_gate
     assert meta['id']=='foundations_gateway' and meta['version']=='0.0.6a.R19','Wrong gateway metadata'
     assert plugin.read('com/foundations/cluster/velocity/FoundationsVelocityGateway.class')[:8]==bytes.fromhex('cafebabe00000041'),'Gateway plugin must target Java 21'
 # Node is compiled and exercised on both CI platforms before packaging.
-with zipfile.ZipFile(ROOT/'minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R17.jar') as node:
-    assert 'version="0.0.6a.R17"' in node.read('META-INF/neoforge.mods.toml').decode()
+with zipfile.ZipFile(ROOT/'minecraft-agent/build/libs/foundations_cluster_node-0.0.6a.R18.jar') as node:
+    assert 'version="0.0.6a.R18"' in node.read('META-INF/neoforge.mods.toml').decode()
     assert node.read('com/foundations/cluster/node/FoundationsClusterNode.class')[:8]==bytes.fromhex('cafebabe00000041')
     assert 'com/foundations/cluster/node/interaction/AuthorityBreakExecutor.class' in node.namelist()
     assert node.read('com/foundations/cluster/playtest/FoundationsPlaytest.class')[:8]==bytes.fromhex('cafebabe00000041'), 'Live recorder missing'
@@ -49,7 +49,7 @@ with zipfile.ZipFile(ROOT/'minecraft-agent/build/libs/foundations_cluster_node-0
     assert 'EntityDataSnapshotAccessor' in mixins and 'EntityIdAllocatorAccessor' in mixins
     assert not any('/spike/' in n or 'foundations_cluster_spike' in n for n in node.namelist()), 'Test mod must not ship to operator worlds'
 files=[{'path':path,'sha256':hashlib.sha256((ROOT/path).read_bytes()).hexdigest()} for path in paths]
-manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'0.0.6a.R19-HF11 through HF16, original 0.0.7a-dev.2, or matching dev.2.R2/R3; stages Node R17','files':files}
+manifest={'schema':1,'component':'manager-gateway-node','version':version,'requires':'0.0.6a.R19-HF11 through HF16, original 0.0.7a-dev.2, or matching dev.2.R2/R3/R4; stages Node R18','files':files}
 output=ROOT/'dist';output.mkdir(exist_ok=True)
 archive=output/f'FoundationsCluster-{version}-UPDATER.zip'
 launcher='''@echo off
@@ -65,6 +65,7 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
     z.write(ROOT/'release/UPDATE_README.txt','README.txt')
     z.write(ROOT/'docs/PLAYTEST_DEV2_GUIDE.md','PLAYTEST_GUIDE.md')
     z.write(ROOT/'docs/ENTITY_AUTO_DISCOVERY_R3_GUIDE.md','ENTITY_VIEWS_GUIDE.md')
+    z.write(ROOT/'docs/ENTITY_TRANSFER_R4_GATES.md','ENTITY_TRANSFER_R4_GATES.md')
     z.write(ROOT/'tools/summarize_playtest.py','summarize_playtest.py')
     z.write(ROOT/'tools/apply_update.ps1','tools/apply_update.ps1')
     for path in paths:z.write(ROOT/path,'payload/'+path)
